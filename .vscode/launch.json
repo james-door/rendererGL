@@ -1,0 +1,29 @@
+{
+"version": "0.2.0",
+"configurations": [
+    {
+        "name": "DebugMSVC",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/Build/mpmRenderer.exe",
+        "args": [],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}/Build/",
+        "environment": [],
+        "console":"newExternalWindow",
+        "preLaunchTask": "MSVC Debug Build",
+    },
+    {
+        "name": "DebugGCC",
+        "type": "cppvsdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/Build/mpmRenderer.exe",
+        "args": [],
+        "stopAtEntry": false,
+        "cwd": "${workspaceFolder}/Build/",
+        "environment": [],
+        "console":"newExternalWindow",
+        "preLaunchTask": "GCC Debug Build",
+    }
+]
+}
