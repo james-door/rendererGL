@@ -2,28 +2,28 @@
 "version": "0.2.0",
 "configurations": [
     {
-        "name": "DebugMSVC",
-        "type": "cppvsdbg",
-        "request": "launch",
-        "program": "${workspaceFolder}/Build/mpmRenderer.exe",
-        "args": [],
-        "stopAtEntry": false,
-        "cwd": "${workspaceFolder}/Build/",
-        "environment": [],
-        "console":"newExternalWindow",
-        "preLaunchTask": "MSVC Debug Build",
-    },
-    {
         "name": "DebugGCC",
-        "type": "cppvsdbg",
+        "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/Build/mpmRenderer.exe",
+        "program": "${workspaceFolder}/Build/mpmRenderer", 
         "args": [],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}/Build/",
         "environment": [],
-        "console":"newExternalWindow",
-        "preLaunchTask": "GCC Debug Build",
+        "MIMode": "gdb",
+        "miDebuggerPath": "/usr/bin/gdb",
+
+
+
+        "setupCommands": [
+            {
+                "description": "Enable pretty-printing",
+                "text": "-enable-pretty-printing",
+                "ignoreFailures": true
+            }
+        ],
+        "preLaunchTask": "GCC Debug Build"
     }
+    
 ]
 }

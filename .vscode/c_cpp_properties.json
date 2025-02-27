@@ -5,7 +5,7 @@
   "configurations": [
     {
       "name": "Linux",
-      "compilerPath": "C:\\cygwin64\\bin\\G++.exe",
+      "compilerPath": "/usr/bin/gcc",
       "intelliSenseMode": "gcc-x64",
       "includePath": [
         "${myIncludePath}",

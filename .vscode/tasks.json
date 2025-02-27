@@ -20,8 +20,8 @@
         {
             "type": "shell",
             "label": "GCC Debug Build",
-            "windows": {
-                "command": "${workspaceFolder}/debugGCC.bat",
+            "linux": {
+                "command": "bash ${workspaceFolder}/debugGCC.sh",
             },
             "options": {
                 "cwd": "${workspaceFolder}"
