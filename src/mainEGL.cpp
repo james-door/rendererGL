@@ -1,20 +1,16 @@
 #include <iostream>
 #include <cassert>
 #include <fstream>
+#include <vector>
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-
-#include "external/glad/glad.h"
-
-// x11
-#include <GL/glx.h>
 
 // egl
 #include <EGL/egl.h>
 
-
-
+// external
+#include "external/glad/glad.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 #include "defintions.h"
 #include "glmath.h"
@@ -60,54 +56,49 @@ i64 compileShader(std::string shaderPath, GLenum shaderType)
 
 
 
+
+
+
 int main() {
-
-
-
-
-    Display* connection = XOpenDisplay(nullptr);
-    i32 default_screen = DefaultScreen(connection);
-    Window root_window = RootWindow(connection,default_screen);
-
-    constexpr i32 tl_window_x = 200;
-    constexpr i32 tl_window_y = 200;
     constexpr i32 client_width = 1024;
     constexpr i32 client_height = 1024;
-    constexpr i32 border_width = 4;
 
+    const EGLint attribute_list[] = {
+            EGL_RED_SIZE, 1,
+            EGL_GREEN_SIZE, 1,
+            EGL_BLUE_SIZE, 1,
+            EGL_NONE
+    };
+
+    eglBindAPI(EGL_OPENGL_API);
+
+    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    assert(display != EGL_NO_DISPLAY);
+    EGLBoolean initalisationSuccess = eglInitialize(display, NULL, NULL);
+    assert(initalisationSuccess == EGL_TRUE);
+
+    EGLConfig config;
+    i32 num_config;
+
+    eglChooseConfig(display, attribute_list, &config, 1, &num_config);
+    assert(num_config > 0);
+
+    EGLContext context = eglCreateContext(display, config, EGL_NO_CONTEXT, NULL);
+
+    assert(context != EGL_NO_CONTEXT);
 
     
+    EGLint offscreen_buffer_attributes[] = {EGL_HEIGHT, client_height, EGL_WIDTH, client_width,EGL_NONE};
+    EGLSurface offscreen_surface = eglCreatePbufferSurface(display,config,offscreen_buffer_attributes);
+    assert(offscreen_surface != EGL_NO_SURFACE);
+
+    EGLBoolean context_creation_success = eglMakeCurrent(display, offscreen_surface, offscreen_surface, context);
+    assert(context_creation_success);
     
-    i32 attribList[] = {GLX_RGBA,GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
-    XVisualInfo* visual_info = glXChooseVisual(connection, default_screen, attribList);
-    assert(visual_info != nullptr);
+
+    i32 glad_load_success = gladLoadGLLoader((GLADloadproc)eglGetProcAddress);
+    assert(glad_load_success);
     
-
-    u64 attirubte_mask = CWEventMask | CWColormap;
-    XSetWindowAttributes window_attributes;
-    window_attributes.colormap = XCreateColormap(connection,root_window,visual_info->visual,AllocNone);
-    window_attributes.event_mask = ExposureMask | KeyPressMask;
-
-
-    Window window = XCreateWindow(connection,root_window,tl_window_x, tl_window_y, client_width, client_height, border_width, visual_info->depth,InputOutput,visual_info->visual,attirubte_mask,&window_attributes);
-
-    XSelectInput(connection,window,ExposureMask | KeyPressMask);
-
-    XMapWindow(connection,window);
-    
-    // XFlush(connection);
-    // XSetWindowBackground(connection, window, 0x00FF00);
-
-    GLXContext context = glXCreateContext(connection, visual_info, NULL, true);
-    assert(context != nullptr);
-    bool context_created = glXMakeCurrent(connection, window, context);
-    assert(context_created == true);
-
-
-    gladLoadGLLoader((GLADloadproc)glXGetProcAddress);
-
-
-
 
     
     glmath::Vec2 triangle_ndc[3] = {
@@ -158,25 +149,13 @@ int main() {
 
 
 
-
-
-    
+    stbi_flip_vertically_on_write(true);
     glClearColor(1.0,0.0,0.0,1.0);
-    glViewport(0,0,client_width,client_height);
+    // glViewport(0,0,client_width,client_height);
 
-    
-    
-    
-    XFree(visual_info);
-    
-    XEvent event;
+    std::vector<u8> colour_buffer(client_width * client_height * 3);
     while(1)
     {
-        if(XPending(connection) > 0)
-        XNextEvent(connection,&event);
-        
-        if(event.type == Expose)
-        {
             glClear(GL_COLOR_BUFFER_BIT);
 
             glUseProgram(shader_program);
@@ -185,12 +164,11 @@ int main() {
 
             glBindVertexArray(0);
 
+            glReadPixels(0,0,client_width, client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+            stbi_write_png("test.png",client_width,client_height,3,colour_buffer.data(), client_width * 3);
+            
 
-            glXSwapBuffers(connection,window);
-
-        }
-        
-
+            eglSwapBuffers(display,offscreen_surface);
     }
 
 
