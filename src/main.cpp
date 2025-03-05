@@ -8,7 +8,14 @@
 
 
 #include "external/glad/glad.h"
+
+// x11
 #include <GL/glx.h>
+
+// egl
+#include <EGL/egl.h>
+
+
 
 
 #include "renderer.cpp"

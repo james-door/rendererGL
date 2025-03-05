@@ -2,23 +2,6 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "MSVC Debug Build",
-            "windows": {
-                "command": "${workspaceFolder}/debugMSVC.bat",
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
-        },
-        {
-            "type": "shell",
             "label": "GCC Debug Build",
             "linux": {
                 "command": "bash ${workspaceFolder}/debugGCC.sh",

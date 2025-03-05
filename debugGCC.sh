@@ -7,10 +7,10 @@ executable_name="mpmRenderer"
 
 mkdir -p "$build_directory"
 
-linkerFlags="-lX11 -lGL"
+linkerFlags="-lX11 -lGL -lEGL"
 includeFlags="-I../src/external -I../src"
 compiler_flags="$includeFlags -std=c++20 -frtti -fasynchronous-unwind-tables -fexceptions -g -Wall -D_DEBUG"
 
 pushd "$build_directory"
-g++ $compiler_flags ../src/main.cpp ../src/external/glad.c  -o "$executable_name" $linkerFlags
+g++ $compiler_flags ../src/mainEGL.cpp ../src/external/glad.c  -o "$executable_name" $linkerFlags
 popd
