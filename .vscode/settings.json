@@ -127,7 +127,18 @@
         "codecvt": "cpp",
         "list": "cpp",
         "string_view": "cpp",
-        "array": "cpp"
+        "array": "cpp",
+        "*.tcc": "cpp",
+        "cstdarg": "cpp",
+        "cwctype": "cpp",
+        "deque": "cpp",
+        "unordered_map": "cpp",
+        "functional": "cpp",
+        "memory_resource": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "numbers": "cpp",
+        "cinttypes": "cpp"
     },
     "workbench.activityBar.location": "hidden",
 

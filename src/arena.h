@@ -79,18 +79,22 @@ struct SubArena
     {
         ptrdiff_t arena_head = std::bit_cast<ptrdiff_t, i8*>(arena.start) + arena.offset;
         ptrdiff_t padding = (alignof(std::max_align_t) -  arena_head % alignof(std::max_align_t)) % alignof(std::max_align_t);
-        arenaPush<i8>(padding);
-        start = arenaPush<i8>(size);
+        
+        arena.template arenaPush<i8>(padding);
+        start = arena.template arenaPush<i8>(size);
         
         end = arena.start + arena.offset;
         offset = 0; 
     }
 
-    template <typename T> T* arenaPush(u64 nItems)
+    template <typename T> 
+    T* arenaPush(u64 nItems)
     { 
         return arenaPushImpl<T>(start, offset, end, nItems, false);
     }
-    template <typename T> T* arenaPushZero(u64 nItems)
+
+    template <typename T> 
+    T* arenaPushZero(u64 nItems)
     {
          return arenaPushImpl<T>(start, offset, end, nItems, true);
     }
