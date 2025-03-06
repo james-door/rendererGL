@@ -34,6 +34,24 @@ u32 stringToU32(const char* str, u8 length)
     return result;
 }
 
+// should log to file
+
+// for release
+// #define RENDERER_LOG(msg) ((void)0)
+#define RENDERER_LOG(msg) rendererLogConsole(msg)
+
+
+inline void rendererLogConsole(const char * msg)
+{
+    constexpr i32 max_timed_log_buffer = 50;
+    char time_log_buffer[max_timed_log_buffer];
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+    i32 data_len = strftime(time_log_buffer, max_timed_log_buffer, "%Y-%m-%d %H:%M:%S", tm_info);
+
+    assert(data_len != 0);
+    std::cout<<time_log_buffer<<" :: "<<msg<<'\n';
+}
 
 
 #endif

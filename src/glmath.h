@@ -34,6 +34,13 @@ namespace glmath
         constexpr Vec3(f32 v) : x(v), y(v), z(v) {};
     };
 
+    Vec3 operator/(const Vec3 &lhs,const f32 &rhs )
+    {
+        return {lhs.x / rhs,
+                lhs.y / rhs,
+                lhs.z / rhs,
+                };
+    }
     Vec3 operator+(const Vec3 &lhs,const Vec3 &rhs )
     {
         return {lhs.x + rhs.x,
@@ -72,6 +79,11 @@ namespace glmath
     f32 dot(const Vec3 &v1, const Vec3 &v2)
     {
         return v1.x * v2.x +  v1.y * v2.y +  v1.z * v2.z;
+    }
+
+    Vec3 normalise(const Vec3 &v)
+    {
+        return ( v / sqrt(dot(v,v)));
     }
     f32 norm(const Vec3 &v)
     {
@@ -382,7 +394,11 @@ namespace glmath
         return result;
     }
 
-    Mat4x4 view(const Vec3 &forwardBasis, const Vec3 &rightBasis,const Vec3 &upBasis, const Vec3 &pos)
+
+
+
+
+    Mat4x4 viewMatrix(const Vec3 &forwardBasis, const Vec3 &rightBasis,const Vec3 &upBasis, const Vec3 &pos)
     {
         Mat4x4 result;
 
@@ -409,10 +425,17 @@ namespace glmath
         return result;
     }
 
+    Mat4x4 lookAt(const Vec3 &camera_pos, const Vec3 &target, const Vec3 &global_up)
+    {
+        Vec3 forward = normalise(target - camera_pos);
+        Vec3 right = normalise(cross(global_up, forward));
+        Vec3 up = cross(forward, right);
+        return viewMatrix(forward, right, up, camera_pos);
+    }
+
+    
     // LHS projection that looks down the +z axis stored in column-major
-
     // Takes the vertical FOV in radians
-
     Mat4x4 perspectiveProjection(f32 verticalFOV, f32  aspectRatio, f32 nearPlane, f32 farPlane)
     {
         f32 c = 1.0f / tan(verticalFOV / 2.0f);

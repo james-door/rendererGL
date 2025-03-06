@@ -26,81 +26,7 @@ glmath::Vec3 up = {0.0,1.0,0.0};
 glmath::Quaternion startDirection = {0.0,0.0,-1.0,0.0};
 glmath::Vec3 initalPos = {0.5,0.5,-2.0};
 
-    
 
-// void cursorCallBack(GLFWwindow * window, f64 newX, f64 newY)
-// {
-//     deltaMouseX = static_cast<f32>(newX - mouseX);
-//     deltaMouseY = static_cast<f32>(newY - mouseY);
-//     mouseX = newX;
-//     mouseY = newY;
-// }
-    
-// struct Camera
-// {
-//     glmath::Mat4x4 view;
-//     glmath::Mat4x4 projection; // shouldn't be here cold data
-//     glmath::Vec3 pos;
-//     glmath::Vec3 cameraFront;
-// };
-
-
-
-// void processUserInput(GLFWwindow * window, Camera &camera)
-// {
-//     f32 mouseSensitivity = glmath::PI / 180.0f *0.05f;
-//     static f32 pitch = 0.0f;
-//     static f32 yaw = 0.0f;
-//     static f32 roll = 0.0f;
-//     constexpr f32 eps = 0.001f;
-//     constexpr f32 cameraSpeed = 0.001f;
-
-//     if(deltaMouseX != 0.0f || deltaMouseY != 0.0f)
-//     {
-//         yaw += deltaMouseX*mouseSensitivity;
-//         pitch +=deltaMouseY*mouseSensitivity;
-//         pitch = std::clamp(pitch, -glmath::PI/2 + eps, glmath::PI /2 - eps); // lock pitch to avoid co-linear basis with view
-
-//         deltaMouseX = 0;
-//         deltaMouseY = 0;
-//     }
-
-
-//         // glmath::Quaternion qz = glmath::Quaternion(0.0,0.0,sin(-roll / 2),cos(-roll /2));
-//         glmath::Quaternion qy = glmath::Quaternion(0.0,sin(-yaw / 2),0.0f,cos(-yaw /2));
-//         glmath::Quaternion qx = glmath::Quaternion(sin(-pitch / 2),0.0f,0.0f,cos(-pitch /2));
-
-
-//         camera.view = glmath::quaternionToMatrix(qx * qy) * glmath::translate(-camera.pos);
-
-//         // Transposed and stored in column-major so its accessed in row-major     
-//         glmath::Vec3 forwardBasis = {
-//                                 camera.view.data[0][2],
-//                                 camera.view.data[1][2],
-//                                 camera.view.data[2][2]
-//                                 };
-
-//         glmath::Vec3 rightBasis  = {
-//                                 camera.view.data[0][0],
-//                                 camera.view.data[1][0],
-//                                 camera.view.data[2][0]
-//                                 };
-
-     
-
-//         if(glfwGetKey(window,GLFW_KEY_W) == GLFW_PRESS)
-//             camera.pos += cameraSpeed * forwardBasis; 
-//         if(glfwGetKey(window,GLFW_KEY_S) == GLFW_PRESS)
-//             camera.pos += -cameraSpeed * forwardBasis;
-//         if(glfwGetKey(window,GLFW_KEY_D) == GLFW_PRESS)
-//             camera.pos += cameraSpeed * rightBasis;
-//         if(glfwGetKey(window,GLFW_KEY_A) == GLFW_PRESS)
-//             camera.pos += -cameraSpeed * rightBasis;
-//         if(glfwGetKey(window,GLFW_KEY_Q) == GLFW_PRESS)
-//             roll += mouseSensitivity;
-//         if(glfwGetKey(window,GLFW_KEY_E) == GLFW_PRESS)
-//             roll -= mouseSensitivity;
-//     }
 
 struct VertexPosNormal
 {
@@ -109,14 +35,6 @@ struct VertexPosNormal
 };
 
 
-enum RenderingType: i8
-{
-    invalidType,
-    pos,
-    pos_normal,
-    pos_uv,
-    typeCount
-};
 
 struct ModelVertexData
 {
@@ -124,7 +42,6 @@ struct ModelVertexData
     i32 index_offset;
     u32 n_verts;
     u32 n_indices;
-    RenderingType rendering_type;
 };
 
 struct ModelMetaData
@@ -206,6 +123,44 @@ void loadPlyModelPos(SubArena& vertexDataArena, SubArena& indexDataArena,ModelMe
     loadIndices(indexDataArena,modelInfo,offset);
 }
 
+i64 compileShader(std::string shaderPath, GLenum shaderType)
+{
+    std::ifstream inf{shaderPath, std::ifstream::binary};
+    if(!inf)
+        return -1;
+    
+    inf.seekg(0,std::ios_base::end);
+    i32 length = static_cast<i32>(inf.tellg());
+    inf.seekg(0,std::ios_base::beg);
+    
+    char *shaderBlob = new char[length];
+    inf.read(shaderBlob,length);
+    inf.close();
+    
+    u32 shaderObj = glCreateShader(shaderType);
+    i32 shaderCompiled;
+    glShaderSource(shaderObj,1,&shaderBlob,&length);
+    glCompileShader(shaderObj);
+    glGetShaderiv(shaderObj,GL_COMPILE_STATUS,&shaderCompiled);
+    
+    delete[] shaderBlob;
+    
+    if(!shaderCompiled)
+    {
+        i32 messageLength;
+        glGetShaderiv(shaderObj,GL_INFO_LOG_LENGTH,&messageLength);
+        if(messageLength == 0)
+            return -1;
+        
+        char *errorMsg = new char[messageLength];
+        glGetShaderInfoLog(shaderObj,messageLength,NULL,errorMsg);
+
+        RENDERER_LOG(errorMsg);
+        delete[] errorMsg;
+        return -1;
+    }
+    return shaderObj;
+}
 
 struct Line
 {
@@ -284,6 +239,11 @@ constexpr i32 MAX_DEBUG_AABB = 10;
 constexpr i32 MAX_POINT_LIGHTS = 1;
 
 
+struct ParticleData
+{
+    glmath::Vec4 position;
+};
+
 struct Renderer
 {
     SubArena debug_render_data; 
@@ -292,15 +252,24 @@ struct Renderer
     std::span<glmath::Vec3> colour;
 
     SubArena dynamic_render_data; 
+    std::span<ParticleData> particle_data;
+    std::span<i32> particle_colour_index;
     std::span<glmath::Vec4> light_pos;
-    std::span<glmath::Vec4> particle_pos;
 
     u32 dynamic_sso;
     u32 debug_vao;
     u32 sphere_vao;
+
+    i32 debug_colours_uniform;
+
+    i32 shader_program;
+    i32 render_mode_uniform;
+    i32 mvp_uniform;
+    i32 particle_scale_uniform;
+
 };
 
-void initialiseRenderer(Renderer &render_manager, i32 n_points)
+i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
 {
     // load sphere to vram
     char path[] = "../data/spherePosNormalTriangulated.ply";
@@ -338,7 +307,7 @@ void initialiseRenderer(Renderer &render_manager, i32 n_points)
 
     // load debug data to vram
 
-    i32 particle_data_size = n_points * sizeof(glmath::Vec4);
+    i32 particle_data_size = n_points * sizeof(ParticleData);
     constexpr i32 point_light_size = MAX_POINT_LIGHTS * sizeof(glmath::Vec4);
     constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
     constexpr i32 debug_data_size = sizeof(DebugAABB) * MAX_DEBUG_AABB + sizeof(Line) * MAX_DEBUG_LINES + sizeof(glmath::Vec3) * (nDebugEntites);
@@ -349,22 +318,23 @@ void initialiseRenderer(Renderer &render_manager, i32 n_points)
     // use vec4 given that in std340/std130 vec3 has an alignment of 16 bytes
 
     render_manager.dynamic_render_data = SubArena(render_data, point_light_size + particle_data_size); 
-
     render_manager.light_pos = std::span<glmath::Vec4>{render_manager.dynamic_render_data.arenaPushZero<glmath::Vec4>(MAX_POINT_LIGHTS), MAX_POINT_LIGHTS};
-    render_manager.particle_pos = std::span<glmath::Vec4>{render_manager.dynamic_render_data.arenaPushZero<glmath::Vec4>(n_points), static_cast<u64>(n_points)};
+    render_manager.particle_data = std::span<ParticleData>{render_manager.dynamic_render_data.arenaPushZero<ParticleData>(n_points), static_cast<u64>(n_points)};
+
+
+
+    // memset(render_manager.particle_colour_index.data(),0,render_manager.particle_colour_index.size_bytes());
 
     srand(20);
     i32 dim = 3;
-    for(auto &point : render_manager.particle_pos)
+    for(auto &point : render_manager.particle_data)
         for(i32 i = 0; i < dim; ++i)
-            point.data[i] = (static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX));
+            point.position.data[i] = (static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX));
 
 
 
 
     render_manager.light_pos[0] = {2.0};
-
-    
 
     
     
@@ -382,14 +352,21 @@ void initialiseRenderer(Renderer &render_manager, i32 n_points)
     u32 debug_buffer; // Lifetime, don't store it as it won't be deallocated
     glGenBuffers(1, &debug_buffer);
     glGenVertexArrays(1, &render_manager.debug_vao);
-    constexpr i32 vertexArenaSize = sizeof(DebugAABB) * MAX_DEBUG_AABB + sizeof(Line) * MAX_DEBUG_LINES;
+    constexpr i32 debug_vertex_arena_size = sizeof(DebugAABB) * MAX_DEBUG_AABB + sizeof(Line) * MAX_DEBUG_LINES;
     const glmath::Vec3 defaultColour{1.0f, 1.0f, 1.0f};
-    render_manager.debug_render_data = SubArena(render_data,vertexArenaSize);
+
+
+
+    render_manager.debug_render_data = SubArena(render_data,debug_vertex_arena_size);
     render_manager.debug_lines = std::span<Line, MAX_DEBUG_LINES>{render_manager.debug_render_data.arenaPushZero<Line>(MAX_DEBUG_LINES), MAX_DEBUG_LINES};
     render_manager.debug_aabb = std::span<DebugAABB, MAX_DEBUG_AABB>{render_manager.debug_render_data.arenaPushZero<DebugAABB>(MAX_DEBUG_AABB), MAX_DEBUG_AABB};
 
     render_manager.colour = std::span<glmath::Vec3, nDebugEntites>{render_data.arenaPushZero<glmath::Vec3>(nDebugEntites), nDebugEntites};
+    
+    
     for(auto &colour : render_manager.colour) colour = defaultColour;
+
+
 
     glBindVertexArray(render_manager.debug_vao);
 
@@ -402,23 +379,81 @@ void initialiseRenderer(Renderer &render_manager, i32 n_points)
     glBindVertexArray(0);
 
 
+    i64 vsObj = compileShader("../src/shaders/vertexShader.glsl", GL_VERTEX_SHADER);
+    i64 fsObj = compileShader("../src/shaders/fragmentShader.glsl", GL_FRAGMENT_SHADER);
+    if(fsObj == -1 || vsObj == -1)
+        return -1;
+    
+    render_manager.shader_program = glCreateProgram();
+    glAttachShader(render_manager.shader_program,static_cast<u32>(vsObj));
+    glAttachShader(render_manager.shader_program,static_cast<u32>(fsObj));
+    glLinkProgram(render_manager.shader_program);
+    i32 programCreated;
+    glGetProgramiv(render_manager.shader_program,GL_LINK_STATUS,&programCreated);
+    if(!programCreated)
+    {
+        i32 length;
+        glGetProgramiv(render_manager.shader_program,GL_INFO_LOG_LENGTH, &length);
+        char *log = new char[length];
+        glGetProgramInfoLog(render_manager.shader_program,length,NULL,log);
+        RENDERER_LOG(log);
+        delete[] log;
+        return -1;
+    }
+
+    render_manager.mvp_uniform = glGetUniformLocation(render_manager.shader_program,"mvp");
+    assert(render_manager.mvp_uniform != -1);
+    // i32 camera_pos_ws_uniform = glGetUniformLocation(shader_program,"camera_pos_ws");
+    // assert(camera_pos_ws_uniform != -1);
+    render_manager.render_mode_uniform = glGetUniformLocation(render_manager.shader_program,"render_mode");
+    assert(render_manager.render_mode_uniform != -1);
+    render_manager.particle_scale_uniform = glGetUniformLocation(render_manager.shader_program,"particle_scale");
+    assert(render_manager.particle_scale_uniform != -1);
+    render_manager.debug_colours_uniform = glGetUniformLocation(render_manager.shader_program,"debugColours");
+    assert(render_manager.debug_colours_uniform != -1);
+
+
+    return 1;
 }
-void renderDebug(const Renderer &debugManager, u32 debugColourUniform)
+
+void renderDebug(const Renderer &renderer)
 {
     // Assumes that shader program has been bound
-    
-    constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
-    glUniform3fv(debugColourUniform, nDebugEntites, debugManager.colour[0].data);
-    
-    
-    glBindVertexArray(debugManager.debug_vao);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, debugManager.debug_render_data.offset, debugManager.debug_render_data.start); //reupload
 
+    glBindVertexArray(renderer.debug_vao);
+    
+    glBufferSubData(GL_ARRAY_BUFFER, 0, renderer.debug_render_data.offset, renderer.debug_render_data.start); //reupload
 
-
-    glLineWidth(1);
+    glLineWidth(2);
     constexpr i32 nVerts = MAX_DEBUG_AABB * 24 + MAX_DEBUG_LINES * 2;
     glDrawArrays(GL_LINES, 0 ,nVerts);
 
     glBindVertexArray(0);
+}
+
+
+void renderParticles(const Renderer & renderer, i32 n_points)
+{
+        //  glUniform3f(camera_pos_ws_uniform,camera.pos.x,camera.pos.y,camera.pos.z);
+         glBindVertexArray(renderer.sphere_vao);
+         glDrawElementsInstanced(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0), n_points);
+         glBindVertexArray(0);
+
+}
+
+void renderScene(const Renderer & renderer, const glmath::Mat4x4 &mvp, i32 n_points)
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glUseProgram(renderer.shader_program);
+    glUniformMatrix4fv(renderer.mvp_uniform, 1, false, mvp.data[0]);
+
+
+    glUniform1ui(renderer.render_mode_uniform,2);
+    glUniform1f(renderer.particle_scale_uniform, 0.05f);
+    renderParticles(renderer ,n_points);
+
+    glUniform1ui(renderer.render_mode_uniform,0);
+    constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
+    glUniform3fv(renderer.debug_colours_uniform, nDebugEntites, renderer.colour[0].data);
+    renderDebug(renderer);
 }

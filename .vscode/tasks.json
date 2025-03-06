@@ -2,9 +2,28 @@
     "tasks": [
         {
             "type": "shell",
-            "label": "GCC Debug Build",
+            "label": "DebugEGL",
             "linux": {
-                "command": "bash ${workspaceFolder}/debugGCC.sh",
+                "command": "${workspaceFolder}/debugGCC.sh",
+                "args": ["EGL"]
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "shell",
+            "label": "DebugX11",
+            "linux": {
+                "command": "${workspaceFolder}/debugGCC.sh",
+                "args": ["X11"]
             },
             "options": {
                 "cwd": "${workspaceFolder}"

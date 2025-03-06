@@ -3,72 +3,26 @@
 #include <fstream>
 #include <vector>
 
-
-// egl
 #include <EGL/egl.h>
 
-// external
 #include "external/glad/glad.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "external/stb_image_write.h"
 
 #include "defintions.h"
 #include "glmath.h"
-
-i64 compileShader(std::string shaderPath, GLenum shaderType)
-{
-    std::ifstream inf{shaderPath, std::ifstream::binary};
-    if(!inf)
-        return -1;
-    
-    inf.seekg(0,std::ios_base::end);
-    i32 length = static_cast<i32>(inf.tellg());
-    inf.seekg(0,std::ios_base::beg);
-    
-    char *shaderBlob = new char[length];
-    inf.read(shaderBlob,length);
-    inf.close();
-    
-    u32 shaderObj = glCreateShader(shaderType);
-    i32 shaderCompiled;
-    glShaderSource(shaderObj,1,&shaderBlob,&length);
-    glCompileShader(shaderObj);
-    glGetShaderiv(shaderObj,GL_COMPILE_STATUS,&shaderCompiled);
-    
-    delete[] shaderBlob;
-    
-    if(!shaderCompiled)
-    {
-        i32 messageLength;
-        glGetShaderiv(shaderObj,GL_INFO_LOG_LENGTH,&messageLength);
-        if(messageLength == 0)
-            return -1;
-        
-        char *errorMsg = new char[messageLength];
-        glGetShaderInfoLog(shaderObj,messageLength,NULL,errorMsg);
-
-        std::cerr<<shaderType<<'\n'<<errorMsg<<std::endl;
-        delete[] errorMsg;
-        return -1;
-    }
-    return shaderObj;
-}
-
-
-
-
-
+#include "renderer.cpp"
 
 int main() {
     constexpr i32 client_width = 1024;
     constexpr i32 client_height = 1024;
-
-    const EGLint attribute_list[] = {
+    constexpr EGLint attribute_list[] = {
             EGL_RED_SIZE, 1,
             EGL_GREEN_SIZE, 1,
             EGL_BLUE_SIZE, 1,
             EGL_NONE
     };
+    constexpr EGLint offscreen_buffer_attributes[] = {EGL_HEIGHT, client_height, EGL_WIDTH, client_width,EGL_NONE};
 
     eglBindAPI(EGL_OPENGL_API);
 
@@ -88,7 +42,6 @@ int main() {
     assert(context != EGL_NO_CONTEXT);
 
     
-    EGLint offscreen_buffer_attributes[] = {EGL_HEIGHT, client_height, EGL_WIDTH, client_width,EGL_NONE};
     EGLSurface offscreen_surface = eglCreatePbufferSurface(display,config,offscreen_buffer_attributes);
     assert(offscreen_surface != EGL_NO_SURFACE);
 
@@ -100,76 +53,43 @@ int main() {
     assert(glad_load_success);
     
 
-    
-    glmath::Vec2 triangle_ndc[3] = {
-                                     {0.5, -0.5}, // BR
-                                     {0.0, 0.5}, // T
-                                     {-0.5, -0.5} // BL
-                                   };
+
+    Renderer renderer = {};
+    i32 n_points = 100;
+    initialiseRenderer(renderer, n_points);
 
 
 
-
-    u32 vao, vbo;
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER,vbo);
-    glBufferData(GL_ARRAY_BUFFER,sizeof(triangle_ndc),triangle_ndc,GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2,GL_FLOAT,GL_FALSE,0,(void*)(0));
-    glEnableVertexAttribArray(0);
-
-    glBindVertexArray(0);
-
-    
-    // load shaders 
-    i64 vsObj = compileShader("../src/shaders/vertexShader.glsl", GL_VERTEX_SHADER);
-    i64 fsObj = compileShader("../src/shaders/fragmentShader.glsl", GL_FRAGMENT_SHADER);
-    if(fsObj == -1 || vsObj == -1)
-        return 1;
-    
-    u32 shader_program = glCreateProgram();
-
-    glAttachShader(shader_program,static_cast<u32>(vsObj));
-    glAttachShader(shader_program,static_cast<u32>(fsObj));
-    glLinkProgram(shader_program);
-    i32 programCreated;
-    glGetProgramiv(shader_program,GL_LINK_STATUS,&programCreated);
-    if(!programCreated)
-    {
-        i32 length;
-        glGetProgramiv(shader_program,GL_INFO_LOG_LENGTH, &length);
-        char *log = new char[length];
-        glGetProgramInfoLog(shader_program,length,NULL,log);
-        std::cout<<log;
-    }
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    glClearColor(1.0,1.0,1.0,1.0);
+    glViewport(0, 0, client_width, client_height);
     
 
-
-
+    f32 vertical_fov = 45.0 * glmath::PI / 180.0;
+    f32 near_plane = 0.1f;
+    f32 far_plane  = 1000.f;
+    f32 aspect_ratio = static_cast<f32>(client_width) / static_cast<f32>(client_height);
+    glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
+    glmath::Vec3 camera_pos = {0.0,0.0,-5.0};
+    glmath::Vec3 look_at = {0.0,0.0,0.0};
+    constexpr glmath::Vec3 up = {0.0,1.0,0.0};
+    glmath::Mat4x4 view = glmath::lookAt(camera_pos,look_at,up);
+    glmath::Mat4x4 mvp = projection * view;
+    
     stbi_flip_vertically_on_write(true);
-    glClearColor(1.0,0.0,0.0,1.0);
-    // glViewport(0,0,client_width,client_height);
-
     std::vector<u8> colour_buffer(client_width * client_height * 3);
+
     while(1)
     {
-            glClear(GL_COLOR_BUFFER_BIT);
+        renderer.debug_aabb[0] = {{0.0}, {1.0}};
+        renderer.colour[MAX_DEBUG_LINES] = {0.0,1.0,0.0};
+        renderScene(renderer,mvp,n_points);
+        
+        glReadPixels(0,0,client_width, client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+        stbi_write_png("test.png",client_width,client_height,3,colour_buffer.data(), client_width * 3);
 
-            glUseProgram(shader_program);
-            glBindVertexArray(vao);
-            glDrawArrays(GL_TRIANGLES,0,3);
-
-            glBindVertexArray(0);
-
-            glReadPixels(0,0,client_width, client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-            stbi_write_png("test.png",client_width,client_height,3,colour_buffer.data(), client_width * 3);
-            
-
-            eglSwapBuffers(display,offscreen_surface);
+        eglSwapBuffers(display,offscreen_surface);
     }
-
-
 }

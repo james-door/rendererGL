@@ -8,13 +8,7 @@
 
 
 #include "external/glad/glad.h"
-
-// x11
-#include <GL/glx.h>
-
-// egl
-#include <EGL/egl.h>
-
+#include "external/glad/glad_glx.h"
 
 
 
@@ -23,44 +17,6 @@
 #include "defintions.h"
 #include "glmath.h"
 
-i64 compileShader(std::string shaderPath, GLenum shaderType)
-{
-    std::ifstream inf{shaderPath, std::ifstream::binary};
-    if(!inf)
-        return -1;
-    
-    inf.seekg(0,std::ios_base::end);
-    i32 length = static_cast<i32>(inf.tellg());
-    inf.seekg(0,std::ios_base::beg);
-    
-    char *shaderBlob = new char[length];
-    inf.read(shaderBlob,length);
-    inf.close();
-    
-    u32 shaderObj = glCreateShader(shaderType);
-    i32 shaderCompiled;
-    glShaderSource(shaderObj,1,&shaderBlob,&length);
-    glCompileShader(shaderObj);
-    glGetShaderiv(shaderObj,GL_COMPILE_STATUS,&shaderCompiled);
-    
-    delete[] shaderBlob;
-    
-    if(!shaderCompiled)
-    {
-        i32 messageLength;
-        glGetShaderiv(shaderObj,GL_INFO_LOG_LENGTH,&messageLength);
-        if(messageLength == 0)
-            return -1;
-        
-        char *errorMsg = new char[messageLength];
-        glGetShaderInfoLog(shaderObj,messageLength,NULL,errorMsg);
-
-        std::cerr<<shaderType<<'\n'<<errorMsg<<std::endl;
-        delete[] errorMsg;
-        return -1;
-    }
-    return shaderObj;
-}
 
 
 int d11_error_handler(Display *connection, XErrorEvent *event)
@@ -72,18 +28,25 @@ int d11_error_handler(Display *connection, XErrorEvent *event)
     return 0;
 }
 
-
-
 struct Camera
 {
     glmath::Vec3 pos;
-    i32 mouse_x;
-    i32 mouse_y;
     f32 pitch;
     f32 yaw;
 };
 
-void handle_input(XEvent &event, Camera& camera, glmath::Mat4x4 &view)
+struct WindowState
+{
+    Display *connection;
+    Window window;
+    i32 client_width;
+    i32 client_height;
+    i32 mouse_x;
+    i32 mouse_y;
+};
+
+
+void handleUserInput(XEvent &event, Camera& camera, WindowState &window_state, glmath::Mat4x4 &view)
 {
 
     constexpr f32 mouseSensitivity = glmath::PI / 180.0f *0.05f;
@@ -91,32 +54,6 @@ void handle_input(XEvent &event, Camera& camera, glmath::Mat4x4 &view)
     constexpr f32 eps = 0.001f;
     static bool first_input = true;
 
-
-
-    if(event.type == MotionNotify)
-    {
-        if(first_input)
-        {
-            camera.mouse_x = event.xmotion.x;
-            camera.mouse_y = event.xmotion.y;
-            first_input = false;            
-        }
-        if(!(event.xmotion.x == camera.mouse_x && event.xmotion.y - camera.mouse_y))
-        {
-            int delta_x = event.xmotion.x - camera.mouse_x;
-            int delta_y = event.xmotion.y - camera.mouse_y;
-            camera.yaw += delta_x * mouseSensitivity;
-            camera.pitch +=delta_y * mouseSensitivity;
-            camera.pitch = std::clamp(camera.pitch, -glmath::PI/2 + eps, glmath::PI /2 - eps); // lock pitch to avoid co-linear basis with view
-
-            camera.mouse_x = event.xmotion.x;
-            camera.mouse_y = event.xmotion.y;
-        }
-        glmath::Quaternion qy = glmath::Quaternion(0.0,sin(-camera.yaw / 2),0.0f,cos(-camera.yaw /2));
-        glmath::Quaternion qx = glmath::Quaternion(sin(-camera.pitch / 2),0.0f,0.0f,cos(-camera.pitch /2));
-        view = glmath::quaternionToMatrix(qx * qy) *  glmath::translate(-camera.pos);;
-        
-    }
     if(event.type == KeyPress)
     {
         KeySym pressed_key = XLookupKeysym(&event.xkey,0);
@@ -147,142 +84,154 @@ void handle_input(XEvent &event, Camera& camera, glmath::Mat4x4 &view)
         {
             camera.pos += camera_speed * rightBasis; 
         }
-        std::cout<<XKeysymToString(pressed_key)<<"\n";
+        // std::cout<<XKeysymToString(pressed_key)<<"\n";
     }
+
+    i32 delta_x = 0;
+    i32 delta_y = 0;
+    i32 bound = 50;
+    if(event.type == MotionNotify)
+    {   
+        i32 current_mouse_x = event.xmotion.x;
+        i32 current_mouse_y = event.xmotion.y;
+
+        if(current_mouse_x> window_state.client_width - bound || current_mouse_x < bound)
+        {
+            i32 temp_delta_x = current_mouse_x - window_state.mouse_x;
+            XWarpPointer(window_state.connection,window_state.window, window_state.window,0,0,0,0, window_state.client_width/2,current_mouse_y);
+            current_mouse_x = window_state.client_width/2 + temp_delta_x;
+            window_state.mouse_x = window_state.client_width/2;
+        }
+        if(current_mouse_y > window_state.client_height - bound || current_mouse_y < bound)
+        {
+            i32 temp_delta_y = current_mouse_y - window_state.mouse_y;
+            XWarpPointer(window_state.connection,window_state.window, window_state.window,0,0,0,0,current_mouse_x, window_state.client_height / 2);
+            current_mouse_y = window_state.client_height/2 + temp_delta_y;
+            window_state.mouse_y = window_state.client_height/2;
+        }
+
+
+
+        if(first_input)
+        {
+            window_state.mouse_x = current_mouse_x;
+            window_state.mouse_y = current_mouse_y;
+            first_input = false;            
+        }
+        if(!(current_mouse_x == window_state.mouse_x && event.xmotion.y - window_state.mouse_y))
+        {
+            delta_x = current_mouse_x - window_state.mouse_x;
+            delta_y = event.xmotion.y - window_state.mouse_y;
+            window_state.mouse_x = current_mouse_x;
+            window_state.mouse_y = current_mouse_y;
+        }
+
+    }
+
+    camera.yaw += delta_x * mouseSensitivity;
+    camera.pitch +=delta_y * mouseSensitivity;
+    camera.pitch = std::clamp(camera.pitch, -glmath::PI/2 + eps, glmath::PI /2 - eps); // lock pitch to avoid co-linear basis with view
+
+    glmath::Quaternion qy = glmath::Quaternion(0.0,sin(-camera.yaw / 2),0.0f,cos(-camera.yaw /2));
+    glmath::Quaternion qx = glmath::Quaternion(sin(-camera.pitch / 2),0.0f,0.0f,cos(-camera.pitch /2));
+    view = glmath::quaternionToMatrix(qx * qy) *  glmath::translate(-camera.pos);;
+    
 
 }
 
 
-
-
-int main() {
-
-    const auto programStartTime = std::chrono::steady_clock::now();
-
-    XSetErrorHandler(d11_error_handler);
-    Display* connection = XOpenDisplay(nullptr);
-    i32 default_screen = DefaultScreen(connection);
-    Window root_window = RootWindow(connection,default_screen);
-
+WindowState createX11WindowAndContext()
+{
     constexpr i32 tl_window_x = 200;
     constexpr i32 tl_window_y = 200;
     constexpr i32 client_width = 1024;
     constexpr i32 client_height = 1024;
     constexpr i32 border_width = 4;
+    constexpr i32 fb_attributes[] = {GLX_RENDER_TYPE, GLX_RGBA_BIT, GLX_RED_SIZE, 8,GLX_GREEN_SIZE, 8,GLX_BLUE_SIZE, 8,GLX_ALPHA_SIZE, 8,GLX_DEPTH_SIZE, 24,GLX_DOUBLEBUFFER, True, None};
+    constexpr int context_attribs[] = {GLX_CONTEXT_MAJOR_VERSION_ARB, 4,GLX_CONTEXT_MINOR_VERSION_ARB, 3, GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB, None};
+    
+    constexpr i32 log_buffer_max_len = 120;
+    char log_buffer[log_buffer_max_len];
 
 
+    XSetErrorHandler(d11_error_handler);
+    Display* connection = XOpenDisplay(nullptr); //X11 allocates
+
+
+    i32 default_screen = DefaultScreen(connection);
+    Window root_window = RootWindow(connection,default_screen);
+
+
+    gladLoadGLX(connection,default_screen);
     
-    
-    i32 attribList[] = {GLX_RGBA,GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None};
-    XVisualInfo* visual_info = glXChooseVisual(connection, default_screen, attribList);
-    assert(visual_info != nullptr);
-    
+
+    i32 n_fb_valid_configs;
+    GLXFBConfig *fb_configs = glXChooseFBConfig(connection,default_screen, fb_attributes, &n_fb_valid_configs); 
+    assert(fb_configs != nullptr);
+    snprintf(log_buffer,log_buffer_max_len,"%d possible frame buffer configurations", n_fb_valid_configs);
+    RENDERER_LOG(log_buffer);
+
+
+    // create a visual from the FBC using glXGetVisualFromFBConfig
+    GLXFBConfig chosen_fb_config = fb_configs[0]; // just choose first one
+    XVisualInfo *visual_info = glXGetVisualFromFBConfig(connection, chosen_fb_config);
 
     u64 attirubte_mask = CWEventMask | CWColormap;
     long input_mask = ExposureMask | KeyPressMask | PointerMotionMask;
     XSetWindowAttributes window_attributes;
     window_attributes.colormap = XCreateColormap(connection,root_window,visual_info->visual,AllocNone);
     window_attributes.event_mask = input_mask;
-
-
     Window window = XCreateWindow(connection,root_window,tl_window_x, tl_window_y, client_width, client_height, border_width, visual_info->depth,InputOutput,visual_info->visual,attirubte_mask,&window_attributes);
 
 
     XSelectInput(connection,window, input_mask);
- 
-
-
     XMapWindow(connection,window);
-
-    
-    GLXContext context = glXCreateContext(connection, visual_info, NULL, true);
+        
+    GLXContext context = glXCreateContextAttribsARB(connection, chosen_fb_config,NULL,true,context_attribs);
     assert(context != nullptr);
-    bool context_created = glXMakeCurrent(connection, window, context);
-    assert(context_created == true);
+    bool current_context_success = glXMakeCurrent(connection, window, context);
+    assert(current_context_success == true);
 
+    XFree(fb_configs);
+    XFree(visual_info);
+    return {connection, window,client_width,client_height,0,0};
+}
+
+
+// TODO: is crashing outside of vscode, get the RENDERER_LOG to write to file
+// TODO: custom assert
+// TODO: get the index in particle data so we have colours
+// TODO: get particle transparency working
+// TOOD: dummy python program interfacing with c++
+// TOOD: dummy taichi  program interfacing with C++
+// TOOD: renderer with dummy taichi
+// TODO: renderer with mpm solver
+
+
+int main()
+{
+    const auto programStartTime = std::chrono::steady_clock::now();
+
+    WindowState window_state = createX11WindowAndContext();
 
     gladLoadGLLoader((GLADloadproc)glXGetProcAddress);
 
-    
-    // glmath::Vec2 triangle_ndc[3] = {
-    //                                  {0.5, -0.5}, // BR
-    //                                  {0.0, 0.5}, // T
-    //                                  {-0.5, -0.5} // BL
-    //                                };
+    const u8 *version = glGetString(GL_VERSION);
+    const char* version_cstr = reinterpret_cast<const char*>(version);
+    rendererLogConsole(version_cstr);
 
 
-
-
-    // u32 vao, vbo;
-    // glGenVertexArrays(1, &vao);
-    // glGenBuffers(1, &vbo);
-
-    // glBindVertexArray(vao);
-    // glBindBuffer(GL_ARRAY_BUFFER,vbo);
-    // glBufferData(GL_ARRAY_BUFFER,sizeof(triangle_ndc),triangle_ndc,GL_STATIC_DRAW);
-
-    // glVertexAttribPointer(0, 2,GL_FLOAT,GL_FALSE,0,(void*)(0));
-    // glEnableVertexAttribArray(0);
-
-    // glBindVertexArray(0);
-
-    
-    // load shaders 
-    i64 vsObj = compileShader("../src/shaders/vertexShader.glsl", GL_VERTEX_SHADER);
-    i64 fsObj = compileShader("../src/shaders/fragmentShader.glsl", GL_FRAGMENT_SHADER);
-    if(fsObj == -1 || vsObj == -1)
-        return 1;
-    
-    u32 shader_program = glCreateProgram();
-
-    glAttachShader(shader_program,static_cast<u32>(vsObj));
-    glAttachShader(shader_program,static_cast<u32>(fsObj));
-    glLinkProgram(shader_program);
-    i32 programCreated;
-    glGetProgramiv(shader_program,GL_LINK_STATUS,&programCreated);
-    if(!programCreated)
-    {
-        i32 length;
-        glGetProgramiv(shader_program,GL_INFO_LOG_LENGTH, &length);
-        char *log = new char[length];
-        glGetProgramInfoLog(shader_program,length,NULL,log);
-        std::cout<<log;
-    }
-    
-
-
-
+    i32 n_points = 100;
     Renderer renderer = {};
-    initialiseRenderer(renderer, 100);
-
+    initialiseRenderer(renderer, n_points);
     f32 vertical_fov = 45.0 * glmath::PI / 180.0;
     f32 near_plane = 0.1f;
     f32 far_plane  = 1000.f;
-    f32 aspect_ratio = static_cast<f32>(client_width) / static_cast<f32>(client_height);
+    f32 aspect_ratio = static_cast<f32>(window_state.client_width) / static_cast<f32>(window_state.client_height);
     glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
-
-    i32 mvp_uniform = glGetUniformLocation(shader_program,"mvp");
-    assert(mvp_uniform != -1);
-
-
-    glClearColor(1.0,0.0,0.0,1.0);
-    glViewport(0,0,client_width,client_height);
     
-    XFree(visual_info);
-    
-    
-    glmath::Mat4x4 model = glmath::translate({0.0, 0.0, 10.0});
-    
-    
-    glmath::Mat4x4 mvp; 
-    
-    XEvent event;
-
     Camera camera {};
     glmath::Mat4x4 view = glmath::identity();
-
-    // XGrabPointer(connection, window, False, ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-    //     GrabModeAsync, GrabModeAsync, window, None, CurrentTime);
 
 
     const auto reachRenderLoopTime = std::chrono::steady_clock::now();
@@ -290,47 +239,64 @@ int main() {
     constexpr i32 titleBarMaxLength = 50;
     char titleBarString[titleBarMaxLength];
     i32 launchTimeLength = snprintf(titleBarString,titleBarMaxLength,"Launch: %3fms",launchTime.count() * 1000.0);
+
+    XEvent event;
+    glmath::Mat4x4 mvp; 
+    Window focused_window;
+    i32 revert;
+
+    // Hide cursor while window is active
+    // static char invisible_data[] = { 0};
+    // Pixmap blank = XCreateBitmapFromData(connection, window, invisible_data, 1, 1);
+    // XColor dummy = {};
+    // Cursor cur = XCreatePixmapCursor(connection, blank, blank, &dummy, &dummy, 0, 0);
+    // XDefineCursor(connection, window, cur);
+    // XFreePixmap(connection, blank);
+
+    //inital opengl state
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT);
+    glClearColor(1.0,1.0,1.0,1.0);
+    glViewport(0, 0, window_state.client_width, window_state.client_height);
+    
     
     while(1)
     {
         const auto frameStart =  std::chrono::steady_clock::now();
 
-        if(XPending(connection) > 0)
+        XGetInputFocus(window_state.connection,&focused_window,&revert);
+        if(focused_window == window_state.window)
         {
-            XNextEvent(connection,&event);
-
-            handle_input(event, camera, view);
-            // if(event.type == Expose)
-            // {
-
-
-            // }
-
-         }
-
-         glClear(GL_COLOR_BUFFER_BIT);
-
-         glUseProgram(shader_program);
-
-         mvp = projection * view * model;
-         glUniformMatrix4fv(mvp_uniform, 1, false, mvp.data[0]);
-         glBindVertexArray(renderer.sphere_vao);
-
-         glDrawElements(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0));
+            XGrabPointer(window_state.connection, window_state.window, False, PointerMotionMask, GrabModeAsync, GrabModeAsync, window_state.window, None, CurrentTime);
+        }
+        else
+        {
+            XUngrabPointer(window_state.connection,CurrentTime);
+        }
 
 
-         glBindVertexArray(0);
+        while (XPending(window_state.connection)) 
+        {
+            XNextEvent(window_state.connection, &event);
+            handleUserInput(event, camera, window_state, view);
+        }
 
-         glXSwapBuffers(connection,window);
+
+
+        mvp = projection * view;
+        renderer.debug_aabb[0] = {{0.0,0.0,0.0}, {1.0,1.0,1.0}};
+        renderer.colour[MAX_DEBUG_LINES] = {0.0,1.0,0.0};
+
+        renderScene(renderer,mvp,n_points);
+
+         glXSwapBuffers(window_state.connection,window_state.window);
+         
          const auto frameEnd =  std::chrono::steady_clock::now();
          const std::chrono::duration<double> frameDuration = frameEnd - frameStart;
          snprintf(&titleBarString[launchTimeLength],titleBarMaxLength - launchTimeLength - 1," Frame: %f3ms", frameDuration.count() * 1000.0);
-         XStoreName(connection, window, titleBarString);
+         XStoreName(window_state.connection, window_state.window, titleBarString);
     }
 
-
-    
-
-
-
 }
+

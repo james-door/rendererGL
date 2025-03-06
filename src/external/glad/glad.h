@@ -4,7 +4,7 @@
 
     Language/Generator: C/C++
     Specification: gl
-    APIs: gl=4.3
+    APIs: gl=4.3<
     Profile: core
     Extensions:
         
