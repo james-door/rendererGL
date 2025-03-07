@@ -1,20 +1,19 @@
 #!/bin/bash
 set -e  # Exit on error
 
-# Set relative paths
 executable_name="mpmRenderer"
 
 includeFlags="-I../../../src/external -I../../../src"
-compiler_flags="$includeFlags -std=c++20 -frtti -fasynchronous-unwind-tables -fexceptions -g -Wall -D_DEBUG"
+compiler_flags="$includeFlags -std=c++20 -frtti -fasynchronous-unwind-tables -fexceptions -O3 -Wall -DNDEBUG"
 
 if [[ $1 == "X11" ]]; then
     linkerFlags="-lX11 -lGL"
     files_to_compile="../../../src/main.cpp ../../../src/external/glad.c ../../../src/external/glad_glx.c"
-    build_directory="Build/debug/X11"
+    build_directory="Build/release/X11"
 elif [[ $1 == "EGL" ]]; then
     linkerFlags="-lGL -lEGL"
     files_to_compile="../../../src/mainEGL.cpp ../../../src/external/glad.c"
-    build_directory="Build/debug/EGL"
+    build_directory="Build/release/EGL"
 else
     echo "Expected \"X11\" or \"EGL\""
     exit 1

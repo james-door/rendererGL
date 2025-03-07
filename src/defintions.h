@@ -35,4 +35,72 @@ STATIC_ASSERT(sizeof(f32) == 4, "Expected f32 to be 4 bytes.");
 STATIC_ASSERT(sizeof(f64) == 8, "Expected f64 to be 8 bytes."); 
 
 
+
+
+void getTime(char *buffer, i32 max_length)
+{
+
+    time_t t = time(NULL);
+    tm *tm_info = localtime(&t);
+    strftime(buffer, max_length, "%Y-%m-%d %H:%M:%S", tm_info);
+}
+
+inline void rendererLogConsole(const char * msg)
+{
+    constexpr i32 max_timed_log_buffer = 50;
+    char time_log_buffer[max_timed_log_buffer];
+    getTime(time_log_buffer, max_timed_log_buffer);
+    std::cout<<time_log_buffer<<" :: "<<msg<<'\n';
+}
+
+inline void rendererLogFile(const char * msg)
+{
+    constexpr char dump_path[] = "log.txt";
+    constexpr i32 max_timed_log_buffer = 50;
+    char time_log_buffer[max_timed_log_buffer];
+
+    getTime(time_log_buffer, max_timed_log_buffer);
+
+    std::ofstream out{dump_path, std::ofstream::app};  
+    out<<time_log_buffer<<" :: "<<msg<<'\n';
+    out.close();
+}
+#define RENDERER_LOG(msg) rendererLogConsole(msg)
+
+void logFileIfFailed(bool err, const char* msg, const char* file, int line)
+{
+    if (!err)
+    {
+        constexpr char dump_path[] = "log.txt";
+        constexpr i32 max_timed_log_buffer = 50;
+        char time_log_buffer[max_timed_log_buffer];
+        
+        getTime(time_log_buffer, max_timed_log_buffer);
+
+        std::ofstream out{dump_path, std::ofstream::app};  
+        out<<time_log_buffer<<" :: "<<msg<<" :: "<<file<<" :: "<<line<<'\n';
+        out.close();
+
+        RENDERER_LOG("Aborting after failed assert.");
+        abort();
+    }
+}
+void logConsoleIfFailed(bool err, const char* msg, const char* file, int line)
+{
+    if (!err)
+    {
+        constexpr i32 max_timed_log_buffer = 50;
+        char time_log_buffer[max_timed_log_buffer];
+        
+        getTime(time_log_buffer, max_timed_log_buffer);
+
+        std::cerr<<time_log_buffer<<" :: "<<msg<<" :: "<<file<<" :: "<<line<<'\n';
+
+        RENDERER_LOG("Aborting after failed assert.");
+        abort();
+    }
+}
+#define RENDERER_ASSERT(err, msg) logConsoleIfFailed(err, msg, __FILE__, __LINE__)
+
+
 #endif

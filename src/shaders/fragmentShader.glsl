@@ -8,7 +8,8 @@ uniform uint render_mode;
 
 out vec4 colour;
 
-in vec3 debugColour;
+in vec4 diffuse_colour;
+in vec3 debug_colour;
 in vec3 pos_ws;
 in vec3 normal;
 
@@ -23,7 +24,7 @@ vec3 goochDiffuse(vec3 normal, vec3 lightDir, vec3 lightColour, vec3 diffuseColo
     vec3 warm = vec3(0.3, 0.3, 0);
     vec3 cool = vec3(0, 0, 0.55);
 
-    float alpha = 0.2;
+    float alpha = 0.4;
     float beta = 0.8;
     
     vec3 k_cool = cool + alpha * diffuseColour;
@@ -54,14 +55,17 @@ vec3 specularReflection(vec3 normal, vec3 lightDir, vec3 viewDir,float shininess
 
 void main()
 {
+    colour = vec4(0.0,1.0,0.0, 1.0);
+    return;
     if(render_mode == LINE)
-        colour = vec4(debugColour, 1.0);
+        colour = vec4(debug_colour, 1.0);
     if(render_mode == FLAT)
         colour = vec4(1.0,1.0,1.0,1.0);
     if(render_mode == PHONG)
     {
         vec3 lightColour = vec3(1.0, 1.0, 1.0);
-        vec3 diffuseColour = vec3(1.0,0.0,0.0); // pre-multiply by pi
+        vec3 diffuseColour = vec3(diffuse_colour); // pre-multiply by pi
+        float alpha = diffuse_colour.w;
         // vec3 specularColour = vec3(1.0,1.0,1.0);
         // float shininess = 10.0;
         
@@ -76,7 +80,7 @@ void main()
         vec3 diffuse = goochDiffuse(n,lightDir,lightColour,diffuseColour);
 
         // vec3 specular = specularReflection(n,lightDir,viewDir,shininess,lightColour,specularColour);
-        colour = vec4((diffuse), 1.0);
+        colour = vec4((diffuse), alpha);
         
     }
 }

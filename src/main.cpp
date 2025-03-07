@@ -1,6 +1,5 @@
 #include <iostream>
-#include <cassert>
-#include <fstream>
+#include <filesystem>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -167,7 +166,9 @@ WindowState createX11WindowAndContext()
 
     i32 n_fb_valid_configs;
     GLXFBConfig *fb_configs = glXChooseFBConfig(connection,default_screen, fb_attributes, &n_fb_valid_configs); 
-    assert(fb_configs != nullptr);
+    RENDERER_ASSERT(fb_configs != nullptr, "Failed to find valid framebuffer config.");
+
+
     snprintf(log_buffer,log_buffer_max_len,"%d possible frame buffer configurations", n_fb_valid_configs);
     RENDERER_LOG(log_buffer);
 
@@ -188,9 +189,10 @@ WindowState createX11WindowAndContext()
     XMapWindow(connection,window);
         
     GLXContext context = glXCreateContextAttribsARB(connection, chosen_fb_config,NULL,true,context_attribs);
-    assert(context != nullptr);
+    RENDERER_ASSERT(context != nullptr, "Could not create OpenGL context.");
     bool current_context_success = glXMakeCurrent(connection, window, context);
-    assert(current_context_success == true);
+    RENDERER_ASSERT(current_context_success == true, "Failed to make the context active.");
+    
 
     XFree(fb_configs);
     XFree(visual_info);
@@ -198,18 +200,30 @@ WindowState createX11WindowAndContext()
 }
 
 
-// TODO: is crashing outside of vscode, get the RENDERER_LOG to write to file
-// TODO: custom assert
-// TODO: get the index in particle data so we have colours
-// TODO: get particle transparency working
 // TOOD: dummy python program interfacing with c++
 // TOOD: dummy taichi  program interfacing with C++
 // TOOD: renderer with dummy taichi
 // TODO: renderer with mpm solver
 
+// Optimisations: 
+// Fixed Camera 100,000 particles
+// With culling: 157524
+// Without culling: 247351 
+
+// Depth test enabled: 157524 (same as with culling) [ascending]
+// Depth test enabled: 991801 (same as with culling) [descending]
+// Depth test disabled: 997043 [ascending]
+
+
+
+
+
 
 int main()
 {
+    std::string cwd = std::string("Current Working Directory: ") + std::filesystem::current_path().string();
+    RENDERER_LOG(cwd.c_str());
+
     const auto programStartTime = std::chrono::steady_clock::now();
 
     WindowState window_state = createX11WindowAndContext();
@@ -218,30 +232,39 @@ int main()
 
     const u8 *version = glGetString(GL_VERSION);
     const char* version_cstr = reinterpret_cast<const char*>(version);
-    rendererLogConsole(version_cstr);
+    RENDERER_LOG(version_cstr);
 
 
-    i32 n_points = 100;
-    Renderer renderer = {};
-    initialiseRenderer(renderer, n_points);
+    bool fixed_camera = True;
+
     f32 vertical_fov = 45.0 * glmath::PI / 180.0;
     f32 near_plane = 0.1f;
     f32 far_plane  = 1000.f;
     f32 aspect_ratio = static_cast<f32>(window_state.client_width) / static_cast<f32>(window_state.client_height);
     glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
-    
+
+
     Camera camera {};
+    glmath::Mat4x4 mvp; 
     glmath::Mat4x4 view = glmath::identity();
+    if(fixed_camera)
+    {
+        camera.pos = {0.5,0.5,-3.0};
+        glmath::Vec3 look_at = {0.5,0.5,0.0};
+        constexpr glmath::Vec3 up = {0.0,1.0,0.0};
+        view = glmath::lookAt(camera.pos,look_at,up);
+        mvp = projection * view;
+    }
+        
 
 
     const auto reachRenderLoopTime = std::chrono::steady_clock::now();
     const std::chrono::duration<double> launchTime = reachRenderLoopTime - programStartTime;
-    constexpr i32 titleBarMaxLength = 50;
+    constexpr i32 titleBarMaxLength = 100;
     char titleBarString[titleBarMaxLength];
     i32 launchTimeLength = snprintf(titleBarString,titleBarMaxLength,"Launch: %3fms",launchTime.count() * 1000.0);
 
     XEvent event;
-    glmath::Mat4x4 mvp; 
     Window focused_window;
     i32 revert;
 
@@ -254,47 +277,95 @@ int main()
     // XFreePixmap(connection, blank);
 
     //inital opengl state
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+
+
+
     glEnable(GL_DEPTH_TEST);
+    // glDepthFunc(GL_LESS); 
+
     glEnable(GL_CULL_FACE);
     glCullFace(GL_FRONT);
+
+
     glClearColor(1.0,1.0,1.0,1.0);
     glViewport(0, 0, window_state.client_width, window_state.client_height);
     
     
+    i32 n_points = 1000000;
+    Renderer renderer = {};
+    initialiseRenderer(renderer, n_points);
+    srand(20);
+    i32 dim = 3;
+    for(auto &point : renderer.particle_data)
+    {
+        for(i32 i = 0; i < dim; ++i)
+            point.position.data[i] = (static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX));
+        
+        // float transparent = static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX);
+        // if(transparent < 0.5)
+        //     point.colour = {1.0, 0.0, 0.0, 1.0};
+        // else
+        //     point.colour = {0.0, 0.0, 1.0, 0.3};
+        point.colour = {1.0, 0.0, 0.0, 1.0};
+
+    }   
+    renderer.light_pos[0] = {2.0};
+    
+
+
+    
+    sortParticlesByDepth(renderer, camera.pos);
+    uploadParticleData(renderer);
+
+    
+    GLuint queryBefore;
+    glGenQueries(1, &queryBefore);
+    GLuint samplesBefore;
+    glGetQueryObjectuiv(queryBefore, GL_QUERY_RESULT, &samplesBefore);
     while(1)
     {
+
         const auto frameStart =  std::chrono::steady_clock::now();
 
-        XGetInputFocus(window_state.connection,&focused_window,&revert);
-        if(focused_window == window_state.window)
-        {
-            XGrabPointer(window_state.connection, window_state.window, False, PointerMotionMask, GrabModeAsync, GrabModeAsync, window_state.window, None, CurrentTime);
-        }
-        else
-        {
-            XUngrabPointer(window_state.connection,CurrentTime);
-        }
-
+        // XGetInputFocus(window_state.connection,&focused_window,&revert);
+        // if(focused_window == window_state.window)
+        // {
+        //     XGrabPointer(window_state.connection, window_state.window, False, PointerMotionMask, GrabModeAsync, GrabModeAsync, window_state.window, None, CurrentTime);
+        // }
+        // else
+        // {
+        //     XUngrabPointer(window_state.connection,CurrentTime);
+        // }
 
         while (XPending(window_state.connection)) 
-        {
+        {   
             XNextEvent(window_state.connection, &event);
-            handleUserInput(event, camera, window_state, view);
+            if(!fixed_camera) handleUserInput(event, camera, window_state, view);
         }
-
 
 
         mvp = projection * view;
         renderer.debug_aabb[0] = {{0.0,0.0,0.0}, {1.0,1.0,1.0}};
         renderer.colour[MAX_DEBUG_LINES] = {0.0,1.0,0.0};
 
-        renderScene(renderer,mvp,n_points);
 
-         glXSwapBuffers(window_state.connection,window_state.window);
-         
+        glBeginQuery(GL_SAMPLES_PASSED, queryBefore);
+
+        renderScene(renderer,mvp,n_points);
+        glXSwapBuffers(window_state.connection,window_state.window);
+        
+        glEndQuery(GL_SAMPLES_PASSED);
+        glGetQueryObjectuiv(queryBefore, GL_QUERY_RESULT, &samplesBefore);
+
+
+
+
+
          const auto frameEnd =  std::chrono::steady_clock::now();
          const std::chrono::duration<double> frameDuration = frameEnd - frameStart;
-         snprintf(&titleBarString[launchTimeLength],titleBarMaxLength - launchTimeLength - 1," Frame: %f3ms", frameDuration.count() * 1000.0);
+         snprintf(&titleBarString[launchTimeLength],titleBarMaxLength - launchTimeLength - 1," Frame: %f3ms Samples: %d", frameDuration.count() * 1000.0, samplesBefore);
          XStoreName(window_state.connection, window_state.window, titleBarString);
     }
 

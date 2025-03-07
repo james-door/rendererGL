@@ -36,6 +36,24 @@
                 "isDefault": true
             }
         },
+        {
+            "type": "shell",
+            "label": "ReleaseX11",
+            "linux": {
+                "command": "${workspaceFolder}/releaseGCC.sh",
+                "args": ["X11"]
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
     ],
     "version": "2.0.0"
 }

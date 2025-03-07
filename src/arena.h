@@ -20,8 +20,8 @@ inline T* arenaPushImpl(i8* start, ptrdiff_t& offset, i8* end, u64 nItems, bool 
     void* new_arena_head = static_cast<void*>(start + offset + padding);
 
     offset += size + padding;
-    assert((std::bit_cast<ptrdiff_t, i8*>(end) - (arena_head + padding + size)) >= 0);
-    assert((std::bit_cast<ptrdiff_t, void*>(new_arena_head) % align) == 0);
+    RENDERER_ASSERT((std::bit_cast<ptrdiff_t, i8*>(end) - (arena_head + padding + size)) >= 0, "Arena ran out of memory.");
+    RENDERER_ASSERT((std::bit_cast<ptrdiff_t, void*>(new_arena_head) % align) == 0, "Somehow broke alignment.");
 
 
     if (zeroInit) memset(new_arena_head, 0, size);

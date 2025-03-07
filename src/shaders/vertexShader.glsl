@@ -16,7 +16,8 @@ uniform mat4x4 mvp;
 #define MAX_POINT_LIGHTS 1
 
 uniform vec3 debugColours[MAX_DEBUG_LINES + MAX_DEBUG_AABB];
-out vec3 debugColour;
+out vec4 diffuse_colour;
+out vec3 debug_colour;
 
 // Paritcles
 uniform float particle_scale;
@@ -29,6 +30,7 @@ out mat4x4 model;
 struct ParticleData
 {
     vec3 position;
+    vec4 colour;
 };
 
 layout(std430, binding = 3) readonly buffer position_buffer
@@ -56,8 +58,9 @@ void main()
   
     if(render_mode == PHONG)
     {
-
+        diffuse_colour = particle[gl_InstanceID].colour;
         mat4 model = calculateModel(particle[gl_InstanceID].position);
+        
         gl_Position = mvp * model * vec4(posWS, 1.0);
         pos_ws = vec3(model * vec4(posWS, 1.0));
         normal = in_normal;
@@ -67,7 +70,7 @@ void main()
     {
         mat4 model = calculateModel(point_light_pos[gl_InstanceID]);
         gl_Position = mvp * model * vec4(posWS, 1.0);
-        debugColour = vec3(1.0f, 1.0f, 1.0f);
+        debug_colour = vec3(1.0f, 1.0f, 1.0f);
     }
     if(render_mode == LINE)
     {
@@ -77,7 +80,7 @@ void main()
         int index = (gl_VertexID < MAX_DEBUG_LINES * nVertsPerLine)
             ? gl_VertexID / nVertsPerLine
             : MAX_DEBUG_LINES + (gl_VertexID - MAX_DEBUG_LINES * nVertsPerLine) / nVertsPerAABB;
-        debugColour = debugColours[index];
+        debug_colour = debugColours[index];
     }
 
 }

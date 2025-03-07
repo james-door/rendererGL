@@ -17,14 +17,6 @@
 #include "glmath.h"
 
 
-f64 mouseX = 0.0;
-f64 mouseY = 0.0;
-f32 deltaMouseX = 0.0;
-f32 deltaMouseY = 0.0;
-
-glmath::Vec3 up = {0.0,1.0,0.0};
-glmath::Quaternion startDirection = {0.0,0.0,-1.0,0.0};
-glmath::Vec3 initalPos = {0.5,0.5,-2.0};
 
 
 
@@ -85,7 +77,7 @@ void loadIndices(SubArena &indexDataArena, const ModelMetaData& modelInfo, i64 o
         // replace reinterpret_cast with memcpy
         u8 face_number = *reinterpret_cast<const u8*>(&modelInfo.blob[offset]); 
         offset += 1; // skip number of vertices in the face
-        assert(face_number == 3 && "Triangulate mesh.");
+        RENDERER_ASSERT(face_number == 3, "Mesh is not all triangles.");
 
         indices[i * 3] = *reinterpret_cast<const u32*>(&modelInfo.blob[offset]);
         offset += 4;
@@ -239,9 +231,11 @@ constexpr i32 MAX_DEBUG_AABB = 10;
 constexpr i32 MAX_POINT_LIGHTS = 1;
 
 
+// use vec4 given that in std340/std130 vec3 has an alignment of 16 bytes
 struct ParticleData
 {
     glmath::Vec4 position;
+    glmath::Vec4 colour;
 };
 
 struct Renderer
@@ -266,13 +260,21 @@ struct Renderer
     i32 render_mode_uniform;
     i32 mvp_uniform;
     i32 particle_scale_uniform;
-
 };
+
+
+
+void uploadParticleData(const Renderer & render_manager)
+{
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,render_manager.dynamic_sso);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, render_manager.dynamic_render_data.offset, render_manager.dynamic_render_data.start);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
 
 i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
 {
     // load sphere to vram
-    char path[] = "../data/spherePosNormalTriangulated.ply";
+    char path[] = "../../../data/spherePosNormalTriangulated.ply";
 
     StackArena sphere_data {1024 * 50}; // NOTE: 50 KiB is over allocation
     ModelMetaData metaData;
@@ -284,6 +286,9 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
     SubArena index_data{sphere_data, index_data_size};
 
     loadPlyModelPos(vertex_data,index_data,metaData);
+
+    std::string render_msg = std::string("Rendering ") + std::to_string(metaData.nTriangles * n_points) + std::string(" triangles.");
+    RENDERER_LOG(render_msg.c_str());
 
     u32 sphere_vbo; // Lifetime, don't store it as it won't be deallocated
     u32 sphere_ebo; // Lifetime, don't store it as it won't be deallocated
@@ -315,38 +320,21 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
     LifeTimeArena render_data{particle_data_size + point_light_size + debug_data_size};
 
 
-    // use vec4 given that in std340/std130 vec3 has an alignment of 16 bytes
-
+    // Allocate dynamic data SysRAM
     render_manager.dynamic_render_data = SubArena(render_data, point_light_size + particle_data_size); 
     render_manager.light_pos = std::span<glmath::Vec4>{render_manager.dynamic_render_data.arenaPushZero<glmath::Vec4>(MAX_POINT_LIGHTS), MAX_POINT_LIGHTS};
     render_manager.particle_data = std::span<ParticleData>{render_manager.dynamic_render_data.arenaPushZero<ParticleData>(n_points), static_cast<u64>(n_points)};
 
-
-
-    // memset(render_manager.particle_colour_index.data(),0,render_manager.particle_colour_index.size_bytes());
-
-    srand(20);
-    i32 dim = 3;
-    for(auto &point : render_manager.particle_data)
-        for(i32 i = 0; i < dim; ++i)
-            point.position.data[i] = (static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX));
-
-
-
-
-    render_manager.light_pos[0] = {2.0};
-
-    
-    
+    // Allocate dynamic data VRAM
     glGenBuffers(1,&render_manager.dynamic_sso);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,render_manager.dynamic_sso);
-    glBufferData(GL_SHADER_STORAGE_BUFFER,render_manager.dynamic_render_data.offset,render_manager.dynamic_render_data.start,GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,3,render_manager.dynamic_sso);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,render_manager.dynamic_render_data.offset,nullptr,GL_DYNAMIC_DRAW);    
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-
 
 
     u32 debug_buffer; // Lifetime, don't store it as it won't be deallocated
@@ -354,35 +342,25 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
     glGenVertexArrays(1, &render_manager.debug_vao);
     constexpr i32 debug_vertex_arena_size = sizeof(DebugAABB) * MAX_DEBUG_AABB + sizeof(Line) * MAX_DEBUG_LINES;
     const glmath::Vec3 defaultColour{1.0f, 1.0f, 1.0f};
-
-
-
     render_manager.debug_render_data = SubArena(render_data,debug_vertex_arena_size);
     render_manager.debug_lines = std::span<Line, MAX_DEBUG_LINES>{render_manager.debug_render_data.arenaPushZero<Line>(MAX_DEBUG_LINES), MAX_DEBUG_LINES};
     render_manager.debug_aabb = std::span<DebugAABB, MAX_DEBUG_AABB>{render_manager.debug_render_data.arenaPushZero<DebugAABB>(MAX_DEBUG_AABB), MAX_DEBUG_AABB};
-
     render_manager.colour = std::span<glmath::Vec3, nDebugEntites>{render_data.arenaPushZero<glmath::Vec3>(nDebugEntites), nDebugEntites};
-    
-    
     for(auto &colour : render_manager.colour) colour = defaultColour;
 
-
-
     glBindVertexArray(render_manager.debug_vao);
-
     glBindBuffer(GL_ARRAY_BUFFER,debug_buffer);
     glBufferData(GL_ARRAY_BUFFER,render_manager.debug_render_data.offset, render_manager.debug_render_data.start,GL_STATIC_READ);
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glmath::Vec3), reinterpret_cast<void*>(0));    
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);
 
 
-    i64 vsObj = compileShader("../src/shaders/vertexShader.glsl", GL_VERTEX_SHADER);
-    i64 fsObj = compileShader("../src/shaders/fragmentShader.glsl", GL_FRAGMENT_SHADER);
-    if(fsObj == -1 || vsObj == -1)
-        return -1;
+    i64 vsObj = compileShader("../../../src/shaders/vertexShader.glsl", GL_VERTEX_SHADER);
+    i64 fsObj = compileShader("../../../src/shaders/fragmentShader.glsl", GL_FRAGMENT_SHADER);
+    RENDERER_ASSERT(vsObj != -1 && vsObj != -1, "Failed to compile shaders.");
+
     
     render_manager.shader_program = glCreateProgram();
     glAttachShader(render_manager.shader_program,static_cast<u32>(vsObj));
@@ -402,42 +380,63 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
     }
 
     render_manager.mvp_uniform = glGetUniformLocation(render_manager.shader_program,"mvp");
-    assert(render_manager.mvp_uniform != -1);
-    // i32 camera_pos_ws_uniform = glGetUniformLocation(shader_program,"camera_pos_ws");
-    // assert(camera_pos_ws_uniform != -1);
+    // assert(render_manager.mvp_uniform != -1);
     render_manager.render_mode_uniform = glGetUniformLocation(render_manager.shader_program,"render_mode");
-    assert(render_manager.render_mode_uniform != -1);
+    // assert(render_manager.render_mode_uniform != -1);
     render_manager.particle_scale_uniform = glGetUniformLocation(render_manager.shader_program,"particle_scale");
-    assert(render_manager.particle_scale_uniform != -1);
+    // assert(render_manager.particle_scale_uniform != -1);
     render_manager.debug_colours_uniform = glGetUniformLocation(render_manager.shader_program,"debugColours");
-    assert(render_manager.debug_colours_uniform != -1);
+    // assert(render_manager.debug_colours_uniform != -1);
 
 
     return 1;
 }
+
+void sortParticlesByDepth(const Renderer &renderer, glmath::Vec3 camera_pos)
+{
+
+    std::sort(renderer.particle_data.begin(), renderer.particle_data.end(), [camera_pos](const ParticleData &a, const ParticleData &b)
+    {
+        float distance_a = 0;
+        float distance_b = 0;
+        for(i32 i = 0 ; i < 3; ++i)
+        {
+            distance_a += (camera_pos.data[i] - a.position.data[i]) * (camera_pos.data[i] - a.position.data[i]);
+            distance_b += (camera_pos.data[i] - b.position.data[i]) * (camera_pos.data[i] - b.position.data[i]);
+        }
+        return distance_a > distance_b; //distance_a < distance_b will sort in ascending order
+    });
+}
+
+
 
 void renderDebug(const Renderer &renderer)
 {
     // Assumes that shader program has been bound
 
     glBindVertexArray(renderer.debug_vao);
-    
     glBufferSubData(GL_ARRAY_BUFFER, 0, renderer.debug_render_data.offset, renderer.debug_render_data.start); //reupload
-
     glLineWidth(2);
     constexpr i32 nVerts = MAX_DEBUG_AABB * 24 + MAX_DEBUG_LINES * 2;
     glDrawArrays(GL_LINES, 0 ,nVerts);
-
     glBindVertexArray(0);
 }
 
 
+
 void renderParticles(const Renderer & renderer, i32 n_points)
 {
-        //  glUniform3f(camera_pos_ws_uniform,camera.pos.x,camera.pos.y,camera.pos.z);
-         glBindVertexArray(renderer.sphere_vao);
-         glDrawElementsInstanced(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0), n_points);
-         glBindVertexArray(0);
+    //  glUniform3f(camera_pos_ws_uniform,camera.pos.x,camera.pos.y,camera.pos.z);
+    glBindVertexArray(renderer.sphere_vao);
+    // GLuint query;
+    // glGenQueries(1, &query);
+    // glBeginQuery(GL_TIME_ELAPSED, query);
+    glDrawElementsInstanced(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0), n_points);
+    // glEndQuery(GL_TIME_ELAPSED);
+    // GLuint64 elapsed;
+    // glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed);
+    // printf("Elapsed: %f ms\n", elapsed / 1e6);
+    glBindVertexArray(0);
 
 }
 
@@ -449,11 +448,13 @@ void renderScene(const Renderer & renderer, const glmath::Mat4x4 &mvp, i32 n_poi
 
 
     glUniform1ui(renderer.render_mode_uniform,2);
-    glUniform1f(renderer.particle_scale_uniform, 0.05f);
+    glUniform1f(renderer.particle_scale_uniform, 0.005f);
     renderParticles(renderer ,n_points);
 
-    glUniform1ui(renderer.render_mode_uniform,0);
-    constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
-    glUniform3fv(renderer.debug_colours_uniform, nDebugEntites, renderer.colour[0].data);
-    renderDebug(renderer);
+    // glUniform1ui(renderer.render_mode_uniform,0);
+    // constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
+    // glUniform3fv(renderer.debug_colours_uniform, nDebugEntites, renderer.colour[0].data);
+    // renderDebug(renderer);
 }
+
+
