@@ -1,14 +1,15 @@
 {
 "version": "0.2.0",
 "configurations": [
+
+   
     {
-        "name": "DebugEGL",
+        "name": "X11Binding",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/Build/EGL/mpmRenderer", 
+        "program": "",
         "args": [],
         "stopAtEntry": false,
-        "cwd": "${workspaceFolder}/Build/EGL",
         "environment": [],
         "MIMode": "gdb",
         "miDebuggerPath": "/usr/bin/gdb",
@@ -20,20 +21,19 @@
                 "ignoreFailures": true
             }
         ],
-        "preLaunchTask": "DebugEGL"
+        "preLaunchTask": "X11Binding"
     },
     {
-        "name": "DebugX11",
+        "name": "rendererX11",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/Build/debug/X11/mpmRenderer", 
+        "program": "${workspaceRoot}/Build/rendererX11",
         "args": [],
         "stopAtEntry": false,
-        "cwd": "${workspaceFolder}/Build/debug/X11",
+        "cwd": "${workspaceFolder}",
         "environment": [],
         "MIMode": "gdb",
         "miDebuggerPath": "/usr/bin/gdb",
-
         "setupCommands": [
             {
                 "description": "Enable pretty-printing",
@@ -41,20 +41,20 @@
                 "ignoreFailures": true
             }
         ],
-        "preLaunchTask": "DebugX11"
+        "preLaunchTask": "rendererX11"
     },
+
     {
-        "name": "ReleaseX11",
+        "name": "rendererEGL",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/Build/release/X11/mpmRenderer", 
+        "program": "${workspaceRoot}/Build/rendererEGL",
         "args": [],
         "stopAtEntry": false,
-        "cwd": "${workspaceFolder}/Build/release/X11",
+        "cwd": "${workspaceFolder}",
         "environment": [],
         "MIMode": "gdb",
         "miDebuggerPath": "/usr/bin/gdb",
-
         "setupCommands": [
             {
                 "description": "Enable pretty-printing",
@@ -62,8 +62,23 @@
                 "ignoreFailures": true
             }
         ],
-        "preLaunchTask": "ReleaseX11"
+        "preLaunchTask": "rendererEGL"
+    },
+
+
+
+
+    {
+        "type": "debugpy",
+        "request": "launch",
+        "name": "Python",
+        "program": "${workspaceFolder}/test.py",
+        "env": {
+            "PYTHONMALLOC": "debug"
+        },
+        "args": ["-Xfrozen_modules=off"]
     }
     
+
 ]
 }

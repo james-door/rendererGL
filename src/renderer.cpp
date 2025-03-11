@@ -17,6 +17,46 @@
 #include "glmath.h"
 
 
+i64 compileShader(std::string shaderPath, GLenum shaderType)
+{
+    // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
+
+    std::ifstream inf{shaderPath, std::ifstream::binary};
+    if(!inf)
+        return -1;
+    
+    inf.seekg(0,std::ios_base::end);
+    i32 length = static_cast<i32>(inf.tellg());
+    inf.seekg(0,std::ios_base::beg);
+    
+    char *shaderBlob = new char[length];
+    inf.read(shaderBlob,length);
+    inf.close();
+    
+    u32 shaderObj = glCreateShader(shaderType);
+    i32 shaderCompiled;
+    glShaderSource(shaderObj,1,&shaderBlob,&length);
+    glCompileShader(shaderObj);
+    glGetShaderiv(shaderObj,GL_COMPILE_STATUS,&shaderCompiled);
+    
+    delete[] shaderBlob;
+    
+    if(!shaderCompiled)
+    {
+        i32 messageLength;
+        glGetShaderiv(shaderObj,GL_INFO_LOG_LENGTH,&messageLength);
+        if(messageLength == 0)
+            return -1;
+        
+        char *errorMsg = new char[messageLength];
+        glGetShaderInfoLog(shaderObj,messageLength,NULL,errorMsg);
+
+        RENDERER_LOG(errorMsg);
+        delete[] errorMsg;
+        return -1;
+    }
+    return shaderObj;
+}
 
 
 
@@ -115,44 +155,6 @@ void loadPlyModelPos(SubArena& vertexDataArena, SubArena& indexDataArena,ModelMe
     loadIndices(indexDataArena,modelInfo,offset);
 }
 
-i64 compileShader(std::string shaderPath, GLenum shaderType)
-{
-    std::ifstream inf{shaderPath, std::ifstream::binary};
-    if(!inf)
-        return -1;
-    
-    inf.seekg(0,std::ios_base::end);
-    i32 length = static_cast<i32>(inf.tellg());
-    inf.seekg(0,std::ios_base::beg);
-    
-    char *shaderBlob = new char[length];
-    inf.read(shaderBlob,length);
-    inf.close();
-    
-    u32 shaderObj = glCreateShader(shaderType);
-    i32 shaderCompiled;
-    glShaderSource(shaderObj,1,&shaderBlob,&length);
-    glCompileShader(shaderObj);
-    glGetShaderiv(shaderObj,GL_COMPILE_STATUS,&shaderCompiled);
-    
-    delete[] shaderBlob;
-    
-    if(!shaderCompiled)
-    {
-        i32 messageLength;
-        glGetShaderiv(shaderObj,GL_INFO_LOG_LENGTH,&messageLength);
-        if(messageLength == 0)
-            return -1;
-        
-        char *errorMsg = new char[messageLength];
-        glGetShaderInfoLog(shaderObj,messageLength,NULL,errorMsg);
-
-        RENDERER_LOG(errorMsg);
-        delete[] errorMsg;
-        return -1;
-    }
-    return shaderObj;
-}
 
 struct Line
 {
@@ -245,12 +247,16 @@ struct Renderer
     std::span<Line> debug_lines;
     std::span<glmath::Vec3> colour;
 
-    SubArena dynamic_render_data; 
-    std::span<ParticleData> particle_data;
-    std::span<i32> particle_colour_index;
-    std::span<glmath::Vec4> light_pos;
+    // SubArena dynamic_render_data; 
+    // std::span<ParticleData> particle_data;
+    // std::span<glmath::Vec4> light_pos;
+    std::vector<ParticleData> particle_data;
+    // std::array<glmath::Vec3, MAX_POINT_LIGHTS> light_pos;
+
+    i64 dynamic_sso_capacity;
 
     u32 dynamic_sso;
+
     u32 debug_vao;
     u32 sphere_vao;
 
@@ -264,21 +270,19 @@ struct Renderer
 
 
 
-void uploadParticleData(const Renderer & render_manager)
-{
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,render_manager.dynamic_sso);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, render_manager.dynamic_render_data.offset, render_manager.dynamic_render_data.start);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-}
 
-i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
+i32 initialiseRenderer(Renderer &render_manager)
 {
+    // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
+
     // load sphere to vram
-    char path[] = "../../../data/spherePosNormalTriangulated.ply";
+    constexpr char sphere_ply_path[] =           "data/spherePosNormalTriangulated.ply";
+    constexpr char particle_shader_vert_path[] = "src/shaders/vertexShader.glsl";
+    constexpr char particle_shader_frag_path[] = "src/shaders/fragmentShader.glsl";
 
     StackArena sphere_data {1024 * 50}; // NOTE: 50 KiB is over allocation
     ModelMetaData metaData;
-    metaData.blob = loadFile(sphere_data, path);
+    metaData.blob = loadFile(sphere_data, sphere_ply_path);
     getPlyMetaData(metaData);
     i64 vertex_data_size = metaData.nVerts * sizeof(VertexPosNormal);
     i64 index_data_size = metaData.nTriangles * 3  * sizeof(i32);
@@ -287,8 +291,6 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
 
     loadPlyModelPos(vertex_data,index_data,metaData);
 
-    std::string render_msg = std::string("Rendering ") + std::to_string(metaData.nTriangles * n_points) + std::string(" triangles.");
-    RENDERER_LOG(render_msg.c_str());
 
     u32 sphere_vbo; // Lifetime, don't store it as it won't be deallocated
     u32 sphere_ebo; // Lifetime, don't store it as it won't be deallocated
@@ -312,25 +314,24 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
 
     // load debug data to vram
 
-    i32 particle_data_size = n_points * sizeof(ParticleData);
+
+
+
     constexpr i32 point_light_size = MAX_POINT_LIGHTS * sizeof(glmath::Vec4);
     constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
     constexpr i32 debug_data_size = sizeof(DebugAABB) * MAX_DEBUG_AABB + sizeof(Line) * MAX_DEBUG_LINES + sizeof(glmath::Vec3) * (nDebugEntites);
     
-    LifeTimeArena render_data{particle_data_size + point_light_size + debug_data_size};
+    LifeTimeArena render_data{point_light_size + debug_data_size};
 
-
-    // Allocate dynamic data SysRAM
-    render_manager.dynamic_render_data = SubArena(render_data, point_light_size + particle_data_size); 
-    render_manager.light_pos = std::span<glmath::Vec4>{render_manager.dynamic_render_data.arenaPushZero<glmath::Vec4>(MAX_POINT_LIGHTS), MAX_POINT_LIGHTS};
-    render_manager.particle_data = std::span<ParticleData>{render_manager.dynamic_render_data.arenaPushZero<ParticleData>(n_points), static_cast<u64>(n_points)};
 
     // Allocate dynamic data VRAM
     glGenBuffers(1,&render_manager.dynamic_sso);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,render_manager.dynamic_sso);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,3,render_manager.dynamic_sso);
-    glBufferData(GL_SHADER_STORAGE_BUFFER,render_manager.dynamic_render_data.offset,nullptr,GL_DYNAMIC_DRAW);    
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 32, nullptr,GL_DYNAMIC_DRAW);    
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    render_manager.dynamic_sso_capacity = 0;
+
 
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -350,15 +351,15 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
 
     glBindVertexArray(render_manager.debug_vao);
     glBindBuffer(GL_ARRAY_BUFFER,debug_buffer);
-    glBufferData(GL_ARRAY_BUFFER,render_manager.debug_render_data.offset, render_manager.debug_render_data.start,GL_STATIC_READ);
+    glBufferData(GL_ARRAY_BUFFER,render_manager.debug_render_data.offset, render_manager.debug_render_data.start,GL_DYNAMIC_READ);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glmath::Vec3), reinterpret_cast<void*>(0));    
     glEnableVertexAttribArray(0);
 
     glBindVertexArray(0);
 
 
-    i64 vsObj = compileShader("../../../src/shaders/vertexShader.glsl", GL_VERTEX_SHADER);
-    i64 fsObj = compileShader("../../../src/shaders/fragmentShader.glsl", GL_FRAGMENT_SHADER);
+    i64 vsObj = compileShader(particle_shader_vert_path, GL_VERTEX_SHADER);
+    i64 fsObj = compileShader(particle_shader_frag_path, GL_FRAGMENT_SHADER);
     RENDERER_ASSERT(vsObj != -1 && vsObj != -1, "Failed to compile shaders.");
 
     
@@ -392,7 +393,9 @@ i32 initialiseRenderer(Renderer &render_manager, i32 n_points)
     return 1;
 }
 
-void sortParticlesByDepth(const Renderer &renderer, glmath::Vec3 camera_pos)
+
+
+void sortParticlesByDepth(Renderer &renderer, const glmath::Vec3 &camera_pos)
 {
 
     std::sort(renderer.particle_data.begin(), renderer.particle_data.end(), [camera_pos](const ParticleData &a, const ParticleData &b)
@@ -424,24 +427,32 @@ void renderDebug(const Renderer &renderer)
 
 
 
-void renderParticles(const Renderer & renderer, i32 n_points)
+void uploadAndRenderParticles(Renderer & renderer)
 {
-    //  glUniform3f(camera_pos_ws_uniform,camera.pos.x,camera.pos.y,camera.pos.z);
-    glBindVertexArray(renderer.sphere_vao);
-    // GLuint query;
-    // glGenQueries(1, &query);
-    // glBeginQuery(GL_TIME_ELAPSED, query);
-    glDrawElementsInstanced(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0), n_points);
-    // glEndQuery(GL_TIME_ELAPSED);
-    // GLuint64 elapsed;
-    // glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed);
-    // printf("Elapsed: %f ms\n", elapsed / 1e6);
-    glBindVertexArray(0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,renderer.dynamic_sso);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,3,renderer.dynamic_sso);
+    if(renderer.dynamic_sso_capacity < static_cast<i64>(renderer.particle_data.size()))
+    {
+        i32 new_size_bytes = renderer.particle_data.capacity() * sizeof(ParticleData);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, new_size_bytes, nullptr,GL_DYNAMIC_DRAW);
+        renderer.dynamic_sso_capacity = static_cast<i64>(renderer.particle_data.capacity());
+    }
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, renderer.particle_data.size() * sizeof(ParticleData),renderer.particle_data.data());
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,0);
 
+
+    glBindVertexArray(renderer.sphere_vao);
+    glDrawElementsInstanced(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0), renderer.particle_data.size()); 
+    glBindVertexArray(0);
+    
+    renderer.particle_data.clear();
+    // renderer.particle_data.resize(0);
 }
 
-void renderScene(const Renderer & renderer, const glmath::Mat4x4 &mvp, i32 n_points)
+void renderScene(Renderer & renderer, const glmath::Mat4x4 &mvp)
 {
+    // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(renderer.shader_program);
     glUniformMatrix4fv(renderer.mvp_uniform, 1, false, mvp.data[0]);
@@ -449,7 +460,9 @@ void renderScene(const Renderer & renderer, const glmath::Mat4x4 &mvp, i32 n_poi
 
     glUniform1ui(renderer.render_mode_uniform,2);
     glUniform1f(renderer.particle_scale_uniform, 0.005f);
-    renderParticles(renderer ,n_points);
+
+
+    uploadAndRenderParticles(renderer);
 
     // glUniform1ui(renderer.render_mode_uniform,0);
     // constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;

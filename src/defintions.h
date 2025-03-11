@@ -1,7 +1,10 @@
 #ifndef DEFINTIONS_H
 #define DEFINTIONS_H
 
-
+#include <iostream>
+#include <time.h>
+#include <fstream>
+#include <cstdarg>
 typedef unsigned char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
@@ -45,62 +48,92 @@ void getTime(char *buffer, i32 max_length)
     strftime(buffer, max_length, "%Y-%m-%d %H:%M:%S", tm_info);
 }
 
-inline void rendererLogConsole(const char * msg)
-{
-    constexpr i32 max_timed_log_buffer = 50;
+inline void rendererLogConsole(const char *format, ...) {
+    constexpr size_t max_log_buffer = 1024;
+    char log_buffer[max_log_buffer];
+
+    va_list args;
+    va_start(args, format);
+    vsnprintf(log_buffer, max_log_buffer, format, args);
+    va_end(args);
+
+    constexpr size_t max_timed_log_buffer = 50;
     char time_log_buffer[max_timed_log_buffer];
     getTime(time_log_buffer, max_timed_log_buffer);
-    std::cout<<time_log_buffer<<" :: "<<msg<<'\n';
+
+    std::cout << time_log_buffer << " :: " << log_buffer << '\n';
 }
 
-inline void rendererLogFile(const char * msg)
+inline void rendererLogFile(const char *format, ...)
 {
     constexpr char dump_path[] = "log.txt";
-    constexpr i32 max_timed_log_buffer = 50;
-    char time_log_buffer[max_timed_log_buffer];
+    constexpr size_t max_log_buffer = 1024;
+    char log_buffer[max_log_buffer];
 
+    va_list args;
+    va_start(args, format);
+    vsnprintf(log_buffer, max_log_buffer, format, args);
+    va_end(args);
+
+    constexpr size_t max_timed_log_buffer = 50;
+    char time_log_buffer[max_timed_log_buffer];
     getTime(time_log_buffer, max_timed_log_buffer);
 
     std::ofstream out{dump_path, std::ofstream::app};  
-    out<<time_log_buffer<<" :: "<<msg<<'\n';
+    out<<time_log_buffer<<" :: "<<log_buffer<<'\n';
     out.close();
 }
-#define RENDERER_LOG(msg) rendererLogConsole(msg)
+#define RENDERER_LOG(...) rendererLogConsole(__VA_ARGS__)
 
-void logFileIfFailed(bool err, const char* msg, const char* file, int line)
+void logFileIfFailed(bool err, const char* file, int line, const char *format, ...)
 {
     if (!err)
     {
         constexpr char dump_path[] = "log.txt";
-        constexpr i32 max_timed_log_buffer = 50;
+        constexpr size_t max_log_buffer = 1024;
+        char log_buffer[max_log_buffer];
+
+        va_list args;
+        va_start(args, format);
+        vsnprintf(log_buffer, max_log_buffer, format, args);
+        va_end(args);
+
+        constexpr size_t max_timed_log_buffer = 50;
         char time_log_buffer[max_timed_log_buffer];
-        
         getTime(time_log_buffer, max_timed_log_buffer);
 
+
         std::ofstream out{dump_path, std::ofstream::app};  
-        out<<time_log_buffer<<" :: "<<msg<<" :: "<<file<<" :: "<<line<<'\n';
+        out<<time_log_buffer<<" :: "<<log_buffer<<" :: "<<file<<" :: "<<line<<'\n';
         out.close();
 
         RENDERER_LOG("Aborting after failed assert.");
         abort();
     }
 }
-void logConsoleIfFailed(bool err, const char* msg, const char* file, int line)
+void logConsoleIfFailed(bool err, const char* file, int line, const char *format, ...)
 {
     if (!err)
     {
-        constexpr i32 max_timed_log_buffer = 50;
+        constexpr size_t max_log_buffer = 1024;
+        char log_buffer[max_log_buffer];
+
+        va_list args;
+        va_start(args, format);
+        vsnprintf(log_buffer, max_log_buffer, format, args);
+        va_end(args);
+
+        constexpr size_t max_timed_log_buffer = 50;
         char time_log_buffer[max_timed_log_buffer];
-        
         getTime(time_log_buffer, max_timed_log_buffer);
 
-        std::cerr<<time_log_buffer<<" :: "<<msg<<" :: "<<file<<" :: "<<line<<'\n';
+        std::cerr<<time_log_buffer<<" :: "<<log_buffer<<" :: "<<file<<" :: "<<line<<'\n';
 
         RENDERER_LOG("Aborting after failed assert.");
         abort();
     }
 }
-#define RENDERER_ASSERT(err, msg) logConsoleIfFailed(err, msg, __FILE__, __LINE__)
+#define RENDERER_ASSERT(err, ...) logConsoleIfFailed(err, __FILE__, __LINE__, __VA_ARGS__)
 
 
 #endif

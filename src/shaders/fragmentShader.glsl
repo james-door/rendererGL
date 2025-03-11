@@ -55,8 +55,6 @@ vec3 specularReflection(vec3 normal, vec3 lightDir, vec3 viewDir,float shininess
 
 void main()
 {
-    colour = vec4(0.0,1.0,0.0, 1.0);
-    return;
     if(render_mode == LINE)
         colour = vec4(debug_colour, 1.0);
     if(render_mode == FLAT)

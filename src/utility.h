@@ -1,7 +1,3 @@
-
-
-
-
 #ifndef UTILITY_H
 #define UTILITY_H
 
@@ -12,15 +8,11 @@
 #include <cassert>
 
 
-
-
-
-
-std::string_view loadFile(StackArena &arena, char* path)
+std::string_view loadFile(StackArena &arena, const char* path)
 {
     std::ifstream file_stream {path, std::ifstream::binary};
     
-    RENDERER_ASSERT(file_stream.is_open(), "Invalid Path."); 
+    RENDERER_ASSERT(file_stream.is_open(), "The path %s is invalid.", path); 
     
     file_stream.seekg(0,std::ios_base::end);
     i32 size = static_cast<i32>(file_stream.tellg());

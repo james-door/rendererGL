@@ -138,8 +138,24 @@
         "numeric": "cpp",
         "random": "cpp",
         "numbers": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "stdio.h": "c",
+        "glad_glx.h": "c",
+        "complex": "cpp",
+        "condition_variable": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp",
+        "mutex": "cpp",
+        "ranges": "cpp",
+        "semaphore": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp",
+        "typeindex": "cpp",
+        "variant": "cpp",
+        "xlib.h": "c"
     },
     "workbench.activityBar.location": "hidden",
+    "C_Cpp.default.compilerPath": "/usr/bin/g++",
 
 }

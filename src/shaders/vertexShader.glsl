@@ -35,7 +35,6 @@ struct ParticleData
 
 layout(std430, binding = 3) readonly buffer position_buffer
 {
-    vec3 point_light_pos[MAX_POINT_LIGHTS];
     ParticleData particle[];
 };
 
@@ -64,14 +63,17 @@ void main()
         gl_Position = mvp * model * vec4(posWS, 1.0);
         pos_ws = vec3(model * vec4(posWS, 1.0));
         normal = in_normal;
-        light_pos_ws = point_light_pos[0];
+        // light_pos_ws = point_light_pos[0];
+        light_pos_ws = vec3(3.0,3.0,3.0);
+
     }
-    if(render_mode == FLAT)
-    {
-        mat4 model = calculateModel(point_light_pos[gl_InstanceID]);
-        gl_Position = mvp * model * vec4(posWS, 1.0);
-        debug_colour = vec3(1.0f, 1.0f, 1.0f);
-    }
+
+    // if(render_mode == FLAT)
+    // {
+    //     mat4 model = calculateModel(point_light_pos[gl_InstanceID]);
+    //     gl_Position = mvp * model * vec4(posWS, 1.0);
+    //     debug_colour = vec3(1.0f, 1.0f, 1.0f);
+    // }
     if(render_mode == LINE)
     {
         gl_Position = mvp * vec4(posWS,1.0);

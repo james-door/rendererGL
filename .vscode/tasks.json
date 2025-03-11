@@ -1,11 +1,12 @@
 {
-    "tasks": [
+    "tasks":
+     [
         {
             "type": "shell",
-            "label": "DebugEGL",
+            "label": "X11Binding",
             "linux": {
-                "command": "${workspaceFolder}/debugGCC.sh",
-                "args": ["EGL"]
+                "command": "bash bind.sh",
+
             },
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -20,10 +21,9 @@
         },
         {
             "type": "shell",
-            "label": "DebugX11",
+            "label": "rendererX11",
             "linux": {
-                "command": "${workspaceFolder}/debugGCC.sh",
-                "args": ["X11"]
+                "command": "bash debugGCC.sh X11"
             },
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -38,10 +38,9 @@
         },
         {
             "type": "shell",
-            "label": "ReleaseX11",
+            "label": "rendererEGL",
             "linux": {
-                "command": "${workspaceFolder}/releaseGCC.sh",
-                "args": ["X11"]
+                "command": "bash debugGCC.sh EGL"
             },
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -53,7 +52,7 @@
                 "kind": "build",
                 "isDefault": true
             }
-        },
+        }
     ],
     "version": "2.0.0"
 }
