@@ -20,7 +20,7 @@
 
 #include <string>
 #include <filesystem>
-
+#include <vector>
 
 #include <EGL/egl.h>
 #include "external/glad/glad.h"

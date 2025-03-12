@@ -12,7 +12,7 @@ if [[ $1 == "X11" ]]; then
     files_to_compile="../src/glrendererX11.cpp ../src/external/glad.c ../src/external/glad_glx.c"
     executable_name="rendererX11"
 elif [[ $1 == "EGL" ]]; then
-    linkerFlags="-lGL -lEGL"
+    linkerFlags="-lGL -lEGL -ldl"
     files_to_compile="../src/glrendererEGL.cpp ../src/external/glad.c"
     executable_name="rendererEGL"
 else
