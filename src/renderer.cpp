@@ -16,6 +16,9 @@
 #include "defintions.h"
 #include "glmath.h"
 
+#define SOFTZOO_CODEBASE 1
+
+
 
 i64 compileShader(std::string shaderPath, GLenum shaderType)
 {
@@ -254,11 +257,10 @@ struct Renderer
     // std::array<glmath::Vec3, MAX_POINT_LIGHTS> light_pos;
 
     i64 dynamic_sso_capacity;
-
     u32 dynamic_sso;
 
     u32 debug_vao;
-    u32 sphere_vao;
+    u32 sphere_vao; 
 
     i32 debug_colours_uniform;
 
@@ -270,16 +272,20 @@ struct Renderer
 
 
 
-
 i32 initialiseRenderer(Renderer &render_manager)
 {
     // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
 
     // load sphere to vram
+    #if SOFTZOO_CODEBASE
+    constexpr char sphere_ply_path[] =           "softzoo/engine/renderer/rendererGL/data/spherePosNormalTriangulated.ply";
+    constexpr char particle_shader_vert_path[] = "softzoo/engine/renderer/rendererGL/src/shaders/vertexShader.glsl";
+    constexpr char particle_shader_frag_path[] = "softzoo/engine/renderer/rendererGL/src/shaders/fragmentShader.glsl";
+    #else
     constexpr char sphere_ply_path[] =           "data/spherePosNormalTriangulated.ply";
     constexpr char particle_shader_vert_path[] = "src/shaders/vertexShader.glsl";
     constexpr char particle_shader_frag_path[] = "src/shaders/fragmentShader.glsl";
-
+    #endif
     StackArena sphere_data {1024 * 50}; // NOTE: 50 KiB is over allocation
     ModelMetaData metaData;
     metaData.blob = loadFile(sphere_data, sphere_ply_path);

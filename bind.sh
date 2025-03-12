@@ -1,4 +1,4 @@
-python_dir=/home/woo487/.conda/envs/mpmcsiro/bin/python
+python_dir=/home/woo487/anaconda3/envs/mpmcsiro/bin/python
 
 
 if [[ $1 == "X11" ]]; then

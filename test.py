@@ -268,37 +268,44 @@ def render(window, camera, scene, canvas):
 
 
 def main():
-    renderer = GlRenderer()
-    background_colour = np.array([0.0, 0.0, 0.0])
-    renderer.setBackgroundColour(background_colour)
+    renderer = GlRenderer(20, 20)
+    # background_colour = np.array([0.0, 0.0, 0.0])
+    # renderer.setBackgroundColour(background_colour)
 
-    pos = np.array([0.5, 0.5, -3.0])
-    lookat = np.array([0.5, 0.5, 1.0])
-    renderer.setCamera(pos, lookat)
+
+    position_np = np.array([[0.0, 0.0, 2.0]])
+    colour_np = np.array([[1.0, 0.0, 0.0, 1.0]])    
+    renderer.particles(position_np, colour_np)
+    renderer.show("test.png")
+
+
+    # pos = np.array([0.5, 0.5, -3.0])
+    # lookat = np.array([0.5, 0.5, 1.0])
+    # renderer.setCamera(pos, lookat)
 
     
-    init()
+    # init()
 
-    frame_id = 0
-    material_colors[WATER] = material_colors[WATER]
-    material_colors[SNOW] =  material_colors[SNOW]
-    material_colors[JELLY] = material_colors[JELLY]
-    set_color_by_material(np.array(material_colors, dtype=np.float32))
+    # frame_id = 0
+    # material_colors[WATER] = material_colors[WATER]
+    # material_colors[SNOW] =  material_colors[SNOW]
+    # material_colors[JELLY] = material_colors[JELLY]
+    # set_color_by_material(np.array(material_colors, dtype=np.float32))
 
-    max_frames = 100
-    while frame_id < max_frames:
+    # max_frames = 100
+    # while frame_id < max_frames:
 
-        if not paused:
-            for _ in range(steps):
-                substep(*GRAVITY)
+    #     if not paused:
+    #         for _ in range(steps):
+    #             substep(*GRAVITY)
 
-        colors_used = F_colors_random if use_random_colors else F_colors
-        F_x_np = F_x.to_numpy()
-        colors_used_np = colors_used.to_numpy()
-        renderer.particles(F_x_np, colors_used_np)
-        renderer.show(f"{frame_id}.png")
+    #     colors_used = F_colors_random if use_random_colors else F_colors
+    #     F_x_np = F_x.to_numpy()
+    #     colors_used_np = colors_used.to_numpy()
+    #     renderer.particles(F_x_np, colors_used_np)
+    #     renderer.show(f"{frame_id}.png")
 
-        frame_id +=1
+    #     frame_id +=1
 
 
 

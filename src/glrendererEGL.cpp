@@ -1,13 +1,19 @@
 // BUGS:
 // 1. Breaks most of the time when using debugpy
+// 2. blue rendering as green... colour spaces ect
+
 
 
 //TODO:
-// 1. support for deubg rendering lines and AABB 
-// 2. support for adding point lights
-// 3. fix debugpy issue
-// 4. support for dyamic loading of opengl/egl or opengl/x11 in the same file
-// 5. supprot for "Headless" x11 rendering
+// 1. the sphere data and shader data should be stored in .so 
+// 2. should be able to switch between double precision and single precesion in both C++ and glsl when compiling
+// 3. imposter spheres and pre-depth pass
+// 4. should be able to have a function that retuns the image as a binary blob so we can save it from python 
+// 5. support for deubg rendering lines and AABB 
+// 6. support for adding point lights
+// 7. fix debugpy issue
+// 8. support for dyamic loading of opengl/egl or opengl/x11 in the same file
+// 9. support for "Headless" x11 rendering
 
 
 
@@ -17,7 +23,6 @@
 #include <nanobind/stl/string.h>
 #endif
 
-
 #include <string>
 #include <filesystem>
 #include <vector>
@@ -26,7 +31,6 @@
 #include "external/glad/glad.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb_image_write.h"
-
 
 #include "defintions.h" 
 #include "glmath.h"
@@ -44,17 +48,15 @@ struct SurfaceState
 
 
 
-SurfaceState createSurfaceAndContext()
+SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
 {
-    constexpr i32 client_width = 1024;
-    constexpr i32 client_height = 1024;
     constexpr EGLint attribute_list[] = {
             EGL_RED_SIZE, 1,
             EGL_GREEN_SIZE, 1,
             EGL_BLUE_SIZE, 1,
             EGL_NONE
     };
-    constexpr EGLint offscreen_buffer_attributes[] = {EGL_HEIGHT, client_height, EGL_WIDTH, client_width,EGL_NONE};
+    EGLint offscreen_buffer_attributes[] = {EGL_HEIGHT, client_height, EGL_WIDTH, client_width,EGL_NONE};
 
     eglBindAPI(EGL_OPENGL_API);
 
@@ -96,12 +98,12 @@ struct GlRenderer
     SurfaceState surface_state;
     Renderer renderer;
     Camera camera;
-    GlRenderer()
+    GlRenderer(i32 width, i32 height)
     {
         RENDERER_LOG("Current Working Directory: %s", std::filesystem::current_path().c_str());
         const auto programStartTime = std::chrono::steady_clock::now();
         
-        surface_state = createSurfaceAndContext();
+        surface_state = createSurfaceAndContext(width, height);
 
         i32 gl_load_status = gladLoadGLLoader((GLADloadproc)eglGetProcAddress);
 
@@ -125,6 +127,7 @@ struct GlRenderer
 
         stbi_flip_vertically_on_write(true);
 
+        camera = {.pos={0.0,0.0,0.0}, .lookat={0.0,0.0,1.0}};
         
         const auto reachRenderLoopTime = std::chrono::steady_clock::now();
         const std::chrono::duration<double> launchTime = reachRenderLoopTime - programStartTime;
@@ -136,11 +139,14 @@ struct GlRenderer
 
 
 
-
+// #define PYTHON_BINDING 1
 #if PYTHON_BINDING
     void particles(nanobind::ndarray<f32, nanobind::shape<-1, 3>>& centres, nanobind::ndarray<f32, nanobind::shape<-1, 4>>& colours)
     {
-        RENDERER_ASSERT((centres.ndim() == 2), "Expected array to be dimension %d",centres.ndim());
+        RENDERER_ASSERT((centres.ndim() == 2), "Expected array to be dimension %d",2);
+        RENDERER_ASSERT((colours.ndim() == 2), "Expected array to be dimension %d",2);
+
+        
         // RENDERER_LOG("Device ID = %u (cpu=%i, cuda=%i)\n", a.device_id(),int(a.device_type() == nanobind::device::cpu::value),int(a.device_type() == nanobind::device::cuda::value));
         
         i64 points_to_allocate = centres.shape(0);
@@ -148,6 +154,7 @@ struct GlRenderer
         {
             glmath::Vec4 pos = {centres(i, 0), centres(i, 1), centres(i,2), 0.0};
             glmath::Vec4 colour = {colours(i, 0), colours(i, 1), colours(i, 2), colours(i, 3)};
+            // RENDERER_LOG("%f, %f, %f, %f",colour.x,colour.y, colour.z,colour.a);
             renderer.particle_data.push_back({pos, colour});
         }
     }
@@ -213,7 +220,7 @@ struct GlRenderer
 #if PYTHON_BINDING
 NB_MODULE(glrendererEGL, m) {
     nanobind::class_<GlRenderer>(m, "GlRenderer")
-        .def(nanobind::init<>())
+        .def(nanobind::init<i32, i32>())
         .def("show", &GlRenderer::show)
         .def("particles", &GlRenderer::particles)
         .def("setCamera", &GlRenderer::setCamera)

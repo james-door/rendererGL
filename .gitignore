@@ -2,3 +2,5 @@ Build
 build
 log.txt
 imgui.ini
+*.png
+.vscode
