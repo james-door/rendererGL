@@ -408,9 +408,15 @@ i32 initialiseRenderer(Renderer &render_manager)
     render_manager.debug_colours_uniform = glGetUniformLocation(render_manager.shader_program,"debugColours");
     // assert(render_manager.debug_colours_uniform != -1);
 
+    // Set shader defaults
+    glUseProgram(render_manager.shader_program);
+    glUniform1f(render_manager.particle_scale_uniform, 0.005f);
+
+
 
     return 1;
 }
+
 
 
 
@@ -475,10 +481,7 @@ void renderScene(Renderer & renderer, const glmath::Mat4x4 &mvp)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(renderer.shader_program);
     glUniformMatrix4fv(renderer.mvp_uniform, 1, false, mvp.data[0]);
-
-
     glUniform1ui(renderer.render_mode_uniform,2);
-    glUniform1f(renderer.particle_scale_uniform, 0.005f);
 
 
     uploadAndRenderParticles(renderer);
@@ -487,6 +490,11 @@ void renderScene(Renderer & renderer, const glmath::Mat4x4 &mvp)
     // constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
     // glUniform3fv(renderer.debug_colours_uniform, nDebugEntites, renderer.colour[0].data);
     // renderDebug(renderer);
+}
+
+void setRadius(const Renderer &renderer, f32 radius)
+{
+    glUniform1f(renderer.particle_scale_uniform, radius);
 }
 
 

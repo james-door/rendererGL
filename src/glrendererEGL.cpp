@@ -1,5 +1,5 @@
 // BUGS:
-// 1. Breaks most of the time when using debugpy
+// 1. X11 Breaks most of the time when using debugpy
 // 2. blue rendering as green... colour spaces ect
 
 
@@ -10,10 +10,13 @@
 // 3. imposter spheres and pre-depth pass
 // 4. should be able to have a function that retuns the image as a binary blob so we can save it from python 
 // 5. support for deubg rendering lines and AABB 
-// 6. support for adding point lights
-// 7. fix debugpy issue
-// 8. support for dyamic loading of opengl/egl or opengl/x11 in the same file
-// 9. support for "Headless" x11 rendering
+// 6. currenlt the radius will affect all particles drawn, there is no per particle nor per call radius
+// 7. support for adding point lights
+
+
+// FUTURE:
+// 1. support for "Headless" x11 rendering
+// 2. support for dyamic loading of opengl/egl or opengl/x11 in the same file
 
 
 #if PYTHON_BINDING
@@ -170,49 +173,6 @@ struct GlRenderer
     {
         glClearColor(np_colour(0), np_colour(1), np_colour(2),1.0);
     }
-#else
-    void particles(const std::vector<glmath::Vec3> &centres, const std::vector<glmath::Vec4> &colours)
-    {
-        i64 points_to_allocate = centres.size();
-        for (i64 i = 0; i < points_to_allocate; ++i)
-        {
-            glmath::Vec4 pos = {centres[i].x, centres[i].y, centres[i].z, 0.0};
-            glmath::Vec4 colour =colours[i];
-            renderer.particle_data.push_back({pos, colour});
-        }
-    }
-
-    void setCamera(glmath::Vec3 pos, glmath::Vec3 lookat)
-    {
-        camera.pos = pos;
-        camera.lookat = lookat;
-    }
-    void setBackgroundColour(glmath::Vec3 colour)
-    {
-        glClearColor(colour.r, colour.g, colour.b, 1.0);
-    }
-#endif
-
-    // void show(const std::string &path)
-    // {
-    //     constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
-    //     constexpr f32 near_plane = 0.1f;
-    //     constexpr f32 far_plane  = 1000.f;
-    //     const f32 aspect_ratio = static_cast<f32>(surface_state.client_width) / static_cast<f32>(surface_state.client_height);
-    //     glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
-        
-    //     constexpr glmath::Vec3 up = {0.0, 1.0, 0.0};
-    //     glmath::Mat4x4 view = glmath::lookAt(camera.pos,camera.lookat,up);
-
-    //     sortParticlesByDepth(renderer,camera.pos);
-    //     renderScene(renderer,projection * view);
-    //     eglSwapBuffers(surface_state.connection, surface_state.surface);
-    //     std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
-
-    //     glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-    //     stbi_write_png("test.png",surface_state.client_width, surface_state.client_height,3,colour_buffer.data(), surface_state.client_width * 3);
-    // }
-    // using Vector3f = nanobind::ndarray<u8, nanobind::numpy, nanobind::shape<-1, -1, 3>>;
 
     auto getImageRGB()
     {
@@ -234,11 +194,6 @@ struct GlRenderer
         // i32 pitch = surface_state.client_width * n_channels;
         // i32 n_rows = surface_state.client_height;
         // i32 n_columns = surface_state.client_width;
-
-    
-
-                
-
         glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
 
         // for(i32 i = 0; i < n_rows; ++i)
@@ -251,6 +206,52 @@ struct GlRenderer
         // stbi_write_png("test.png",surface_state.client_width, surface_state.client_height ,3, colour_buffer.data(), surface_state.client_width * 3);
         return nanobind::cast(nanobind::ndarray<u8, nanobind::numpy>(colour_buffer.data(), {static_cast<u64>(surface_state.client_height), static_cast<u64>(surface_state.client_width), static_cast<u64>(n_channels)}));
     }
+
+#else
+    void particles(const std::vector<glmath::Vec3> &centres, const std::vector<glmath::Vec4> &colours, f32 radius)
+    {
+        // set the radius for all particles in the frame, should really just be for this call
+        setRadius(renderer,radius);
+
+
+        i64 points_to_allocate = centres.size();
+        for (i64 i = 0; i < points_to_allocate; ++i)
+        {
+            glmath::Vec4 pos = {centres[i].x, centres[i].y, centres[i].z, 0.0};
+            glmath::Vec4 colour =colours[i];
+            renderer.particle_data.push_back({pos, colour});
+        }
+    }
+
+    void setCamera(glmath::Vec3 pos, glmath::Vec3 lookat)
+    {
+        camera.pos = pos;
+        camera.lookat = lookat;
+    }
+    void setBackgroundColour(glmath::Vec3 colour)
+    {
+        glClearColor(colour.r, colour.g, colour.b, 1.0);
+    }
+    void show(const std::string &path)
+    {
+        constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
+        constexpr f32 near_plane = 0.1f;
+        constexpr f32 far_plane  = 1000.f;
+        const f32 aspect_ratio = static_cast<f32>(surface_state.client_width) / static_cast<f32>(surface_state.client_height);
+        glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
+        
+        constexpr glmath::Vec3 up = {0.0, 1.0, 0.0};
+        glmath::Mat4x4 view = glmath::lookAt(camera.pos,camera.lookat,up);
+
+        sortParticlesByDepth(renderer,camera.pos);
+        renderScene(renderer,projection * view);
+        eglSwapBuffers(surface_state.connection, surface_state.surface);
+        std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
+
+        glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+        stbi_write_png("test.png",surface_state.client_width, surface_state.client_height,3,colour_buffer.data(), surface_state.client_width * 3);
+    }
+#endif
 
     void logDiagnostics();
 };
@@ -293,20 +294,15 @@ int main()
         }   
 
 
-    auto renderer = GlRenderer();
+    auto renderer = GlRenderer(2000, 2000);
 
     glmath::Vec3 pos = {0.5,0.5,-2.0};
     glmath::Vec3 lookat = {0.5,0.5,0.5};
 
     renderer.setCamera(pos, lookat);
 
-        // for(i32 i = 0; i < 100; ++i)
-        // {
-        //     points.push_back({static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX)});
-        // }
-  
-    renderer.particles(points, colour);
-    renderer.show();
+    renderer.particles(points, colour, 0.0001);
+    renderer.show("test.png");
 
 
 
