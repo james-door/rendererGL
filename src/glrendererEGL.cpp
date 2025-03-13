@@ -143,10 +143,11 @@ struct GlRenderer
 
 // #define PYTHON_BINDING 1
 #if PYTHON_BINDING
-    void particles(nanobind::ndarray<f32, nanobind::shape<-1, 3>>& centres, nanobind::ndarray<f32, nanobind::shape<-1, 4>>& colours)
+    void particles(nanobind::ndarray<f32, nanobind::shape<-1, 3>>& centres, nanobind::ndarray<f32, nanobind::shape<-1, 4>>& colours, f32 radius)
     {
         RENDERER_ASSERT((centres.ndim() == 2), "Expected array to be dimension %d",2);
         RENDERER_ASSERT((colours.ndim() == 2), "Expected array to be dimension %d",2);
+        setRadius(renderer,radius);
 
         
         // RENDERER_LOG("Device ID = %u (cpu=%i, cuda=%i)\n", a.device_id(),int(a.device_type() == nanobind::device::cpu::value),int(a.device_type() == nanobind::device::cuda::value));

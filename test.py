@@ -298,7 +298,7 @@ def main():
         colors_used = F_colors_random if use_random_colors else F_colors
         F_x_np = F_x.to_numpy()
         colors_used_np = colors_used.to_numpy()
-        renderer.particles(F_x_np, colors_used_np)
+        renderer.particles(F_x_np, colors_used_np, 0.001)
         test = renderer.getImageRGB()
         imsave("test.png",test)
 
