@@ -28,7 +28,10 @@ target_link_libraries(glrendererX11 PRIVATE X11 OpenGL)
 
 elseif(DISPLAY_TYPE STREQUAL "EGL")
 
-nanobind_add_module(glrendererEGL src/glrendererEGL.cpp  src/external/glad.c)
+
+
+nanobind_add_module(glrendererEGL src/glrendererEGL.cpp  src/external/glad.c sphere_data.o vertex_shader_data.o fragment_shader_data.o)
+
 target_include_directories(glrendererEGL PRIVATE src/external)
 find_package(OpenGL REQUIRED EGL OpenGL)
 target_link_libraries(glrendererEGL PRIVATE OpenGL::OpenGL OpenGL::EGL)

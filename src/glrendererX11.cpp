@@ -2,7 +2,6 @@
 // 1. Breaks most of the time when using debugpy
 
 
-
 #if PYTHON_BINDING
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -368,8 +367,22 @@ NB_MODULE(glrendererX11, m) {
 
 }
 #else
+
+
+extern char _binary_spherePosNormalTriangulated_ply_start;
+// extern char _binary_spherePosNormalTriangulated_ply_end;
+// std::string_view loadSphere(StackArena &arena)
+// {
+//     const char *blob_start = &_binary_spherePosNormalTriangulated_ply_start;
+//     const char *blob_end = &_binary_spherePosNormalTriangulated_ply_end;
+//     // i64 size = std::bit_cast<intptr_t, char*>(blob_end) -std::bit_cast<intptr_t, char*>(blob_start);
+//     // assert(size > 0 );
+//     return {};
+// }
+
 int main()
 {
+
         srand(20);
         
         i32 dim = 3;

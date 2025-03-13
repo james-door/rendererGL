@@ -8,6 +8,7 @@
 #include <array>
 #include <algorithm>
 
+
 #include "external/glad/glad.h"
 
 #include "defintions.h"
@@ -16,33 +17,24 @@
 #include "defintions.h"
 #include "glmath.h"
 
-#define SOFTZOO_CODEBASE 1
+
+
+#define SOFTZOO_CODEBASE 0
 
 
 
-i64 compileShader(std::string shaderPath, GLenum shaderType)
+i64 compileShader(std::string_view shader_blob, GLenum shaderType)
 {
     // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
 
-    std::ifstream inf{shaderPath, std::ifstream::binary};
-    if(!inf)
-        return -1;
-    
-    inf.seekg(0,std::ios_base::end);
-    i32 length = static_cast<i32>(inf.tellg());
-    inf.seekg(0,std::ios_base::beg);
-    
-    char *shaderBlob = new char[length];
-    inf.read(shaderBlob,length);
-    inf.close();
-    
     u32 shaderObj = glCreateShader(shaderType);
     i32 shaderCompiled;
-    glShaderSource(shaderObj,1,&shaderBlob,&length);
+    const char* shader_source = shader_blob.data();
+    GLint shader_length = static_cast<GLint>(shader_blob.length());
+    glShaderSource(shaderObj,1,&shader_source,&shader_length);
     glCompileShader(shaderObj);
     glGetShaderiv(shaderObj,GL_COMPILE_STATUS,&shaderCompiled);
     
-    delete[] shaderBlob;
     
     if(!shaderCompiled)
     {
@@ -272,23 +264,42 @@ struct Renderer
 
 
 
+
+extern char _binary_spherePosNormalTriangulated_ply_start;
+extern char _binary_spherePosNormalTriangulated_ply_end;
+extern char _binary_vertexShader_glsl_start;
+extern char _binary_vertexShader_glsl_end;
+extern char _binary_fragmentShader_glsl_start;
+extern char _binary_fragmentShader_glsl_end;
+
+
+std::string_view loadBlobFromBinary(StackArena &arena, const char &start, const char &end)
+{
+    const char *blob_start = &start;
+    const char *blob_end = &end;
+    i64 size = std::bit_cast<intptr_t, const char*>(blob_end) -std::bit_cast<intptr_t, const char*>(blob_start);
+
+    char* buffer = arena.arenaPush<char>(size);
+    memcpy(buffer, blob_start, size);
+
+
+    assert(size > 0 );
+    return {buffer, static_cast<u64>(size)};
+}
+
+
+
+
 i32 initialiseRenderer(Renderer &render_manager)
 {
     // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
 
     // load sphere to vram
-    #if SOFTZOO_CODEBASE
-    constexpr char sphere_ply_path[] =           "softzoo/engine/renderer/rendererGL/data/spherePosNormalTriangulated.ply";
-    constexpr char particle_shader_vert_path[] = "softzoo/engine/renderer/rendererGL/src/shaders/vertexShader.glsl";
-    constexpr char particle_shader_frag_path[] = "softzoo/engine/renderer/rendererGL/src/shaders/fragmentShader.glsl";
-    #else
-    constexpr char sphere_ply_path[] =           "data/spherePosNormalTriangulated.ply";
-    constexpr char particle_shader_vert_path[] = "src/shaders/vertexShader.glsl";
-    constexpr char particle_shader_frag_path[] = "src/shaders/fragmentShader.glsl";
-    #endif
-    StackArena sphere_data {1024 * 50}; // NOTE: 50 KiB is over allocation
+    StackArena sphere_data {1024 * 100}; // NOTE: 50 KiB is over allocation
     ModelMetaData metaData;
-    metaData.blob = loadFile(sphere_data, sphere_ply_path);
+
+    metaData.blob = loadBlobFromBinary(sphere_data,_binary_spherePosNormalTriangulated_ply_start, _binary_spherePosNormalTriangulated_ply_end);
+
     getPlyMetaData(metaData);
     i64 vertex_data_size = metaData.nVerts * sizeof(VertexPosNormal);
     i64 index_data_size = metaData.nTriangles * 3  * sizeof(i32);
@@ -364,8 +375,10 @@ i32 initialiseRenderer(Renderer &render_manager)
     glBindVertexArray(0);
 
 
-    i64 vsObj = compileShader(particle_shader_vert_path, GL_VERTEX_SHADER);
-    i64 fsObj = compileShader(particle_shader_frag_path, GL_FRAGMENT_SHADER);
+    auto vert_blob = loadBlobFromBinary(sphere_data, _binary_vertexShader_glsl_start, _binary_vertexShader_glsl_end);
+    auto frag_blob = loadBlobFromBinary(sphere_data, _binary_fragmentShader_glsl_start, _binary_fragmentShader_glsl_end);
+    i64 vsObj = compileShader(vert_blob, GL_VERTEX_SHADER);
+    i64 fsObj = compileShader(frag_blob, GL_FRAGMENT_SHADER);
     RENDERER_ASSERT(vsObj != -1 && vsObj != -1, "Failed to compile shaders.");
 
     
