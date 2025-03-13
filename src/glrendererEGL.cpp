@@ -16,7 +16,6 @@
 // 9. support for "Headless" x11 rendering
 
 
-
 #if PYTHON_BINDING
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -194,7 +193,28 @@ struct GlRenderer
     }
 #endif
 
-    void show(const std::string &path)
+    // void show(const std::string &path)
+    // {
+    //     constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
+    //     constexpr f32 near_plane = 0.1f;
+    //     constexpr f32 far_plane  = 1000.f;
+    //     const f32 aspect_ratio = static_cast<f32>(surface_state.client_width) / static_cast<f32>(surface_state.client_height);
+    //     glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
+        
+    //     constexpr glmath::Vec3 up = {0.0, 1.0, 0.0};
+    //     glmath::Mat4x4 view = glmath::lookAt(camera.pos,camera.lookat,up);
+
+    //     sortParticlesByDepth(renderer,camera.pos);
+    //     renderScene(renderer,projection * view);
+    //     eglSwapBuffers(surface_state.connection, surface_state.surface);
+    //     std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
+
+    //     glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+    //     stbi_write_png("test.png",surface_state.client_width, surface_state.client_height,3,colour_buffer.data(), surface_state.client_width * 3);
+    // }
+    // using Vector3f = nanobind::ndarray<u8, nanobind::numpy, nanobind::shape<-1, -1, 3>>;
+
+    auto getImageRGB()
     {
         constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
         constexpr f32 near_plane = 0.1f;
@@ -209,10 +229,29 @@ struct GlRenderer
         renderScene(renderer,projection * view);
         eglSwapBuffers(surface_state.connection, surface_state.surface);
         std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
+        // std::vector<u8> colour_buffer_flipped(surface_state.client_width * surface_state.client_height * 3);
+        i32 n_channels= 3;
+        // i32 pitch = surface_state.client_width * n_channels;
+        // i32 n_rows = surface_state.client_height;
+        // i32 n_columns = surface_state.client_width;
+
+    
+
+                
 
         glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-        stbi_write_png("test.png",surface_state.client_width, surface_state.client_height,3,colour_buffer.data(), surface_state.client_width * 3);
+
+        // for(i32 i = 0; i < n_rows; ++i)
+        // {
+        //     for(i32 j =0; j < n_columns; ++j)
+        //     {
+        //         colour_buffer_flipped[i + j*pitch] = colour_buffer[i*pitch + j];
+        //     }
+        // }
+        // stbi_write_png("test.png",surface_state.client_width, surface_state.client_height ,3, colour_buffer.data(), surface_state.client_width * 3);
+        return nanobind::cast(nanobind::ndarray<u8, nanobind::numpy>(colour_buffer.data(), {static_cast<u64>(surface_state.client_height), static_cast<u64>(surface_state.client_width), static_cast<u64>(n_channels)}));
     }
+
     void logDiagnostics();
 };
 
@@ -221,7 +260,7 @@ struct GlRenderer
 NB_MODULE(glrendererEGL, m) {
     nanobind::class_<GlRenderer>(m, "GlRenderer")
         .def(nanobind::init<i32, i32>())
-        .def("show", &GlRenderer::show)
+        .def("getImageRGB", &GlRenderer::getImageRGB)
         .def("particles", &GlRenderer::particles)
         .def("setCamera", &GlRenderer::setCamera)
         .def("setBackgroundColour", &GlRenderer::setBackgroundColour);
@@ -267,7 +306,7 @@ int main()
         // }
   
     renderer.particles(points, colour);
-    renderer.show("test.png");
+    renderer.show();
 
 
 

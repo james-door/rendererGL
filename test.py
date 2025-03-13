@@ -1,5 +1,5 @@
 import numpy as np
-
+from skimage.io import imsave
 import taichi as ti
 
 ti.init(arch=ti.cuda)
@@ -288,7 +288,7 @@ def main():
     material_colors[JELLY] = material_colors[JELLY]
     set_color_by_material(np.array(material_colors, dtype=np.float32))
 
-    max_frames = 100
+    max_frames = 1
     while frame_id < max_frames:
 
         if not paused:
@@ -299,9 +299,12 @@ def main():
         F_x_np = F_x.to_numpy()
         colors_used_np = colors_used.to_numpy()
         renderer.particles(F_x_np, colors_used_np)
-        renderer.show(f"{frame_id}.png")
+        test = renderer.getImageRGB()
+        imsave("test.png",test)
 
         frame_id +=1
+        
+        
 
 
 
