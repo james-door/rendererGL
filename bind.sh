@@ -1,4 +1,3 @@
-python_dir=/home/woo487/anaconda3/envs/mpmcsiro/bin/python
 
 
 if [[ $1 == "X11" ]]; then
@@ -8,6 +7,13 @@ elif [[ $1 == "EGL" ]]; then
 else
     echo "Expected \"X11\" or \"EGL\""
     exit 1
+fi
+
+if [-z "$2"]; then
+    echo "Expected that path to the python executable to use for compiling."
+    exit 1
+else
+    python_dir=$2
 fi
 
 mkdir -p $build_dir
