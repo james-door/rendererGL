@@ -21,7 +21,7 @@ if [[ $1 == "X11" ]]; then
     executable_name="rendererX11"
 elif [[ $1 == "EGL" ]]; then
     linkerFlags="-lGL -lEGL -ldl"
-    files_to_compile="../../src/glrendererEGL.cpp ../../src/external/glad.c"
+    files_to_compile="../../src/glrendererEGL.cpp ../../src/external/glad.c ../../src/external/glad_egl.c"
     executable_name="rendererEGL"
 else
     echo "Expected first parameter to be 'X11' or 'EGL'"

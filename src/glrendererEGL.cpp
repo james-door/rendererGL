@@ -5,6 +5,12 @@
 
 
 //TODO:
+// 1. support no x-forwading using EGL_PLATFORM_SURFACELESS_MESA this requires 
+        // EGL_EXT_device_enumeration
+        // EGL_EXT_device_query
+        // EGL_EXT_platform_base
+        // EGL_EXT_platform_device
+        
 // 2. should be able to switch between double precision and single precesion in both C++ and glsl when compiling
 // 3. imposter spheres and pre-depth pass
 // 5. support for deubg rendering lines and AABB 
@@ -27,8 +33,10 @@
 #include <filesystem>
 #include <vector>
 
-#include <EGL/egl.h>
+// #include <EGL/egl.h>
 #include "external/glad/glad.h"
+#include "external/glad/glad_egl.h"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb_image_write.h"
 
@@ -50,17 +58,40 @@ struct SurfaceState
 
 SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
 {
-    constexpr EGLint attribute_list[] = {
-            EGL_RED_SIZE, 1,
-            EGL_GREEN_SIZE, 1,
-            EGL_BLUE_SIZE, 1,
-            EGL_NONE
-    };
+  static const EGLint attribute_list[] = {
+          EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+          EGL_BLUE_SIZE, 8,
+          EGL_GREEN_SIZE, 8,
+          EGL_RED_SIZE, 8,
+          EGL_DEPTH_SIZE, 8,
+          EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+          EGL_NONE
+  };    
     EGLint offscreen_buffer_attributes[] = {EGL_HEIGHT, client_height, EGL_WIDTH, client_width,EGL_NONE};
 
+
+
+    gladLoadEGL();
     eglBindAPI(EGL_OPENGL_API);
 
-    EGLDisplay connection = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    static const int MAX_DEVICES = 20;
+    EGLDeviceEXT devices[MAX_DEVICES];
+    EGLint numDevices;
+    eglQueryDevicesEXT(MAX_DEVICES, devices, &numDevices);
+
+    
+    RENDERER_LOG("Found %d device(s)\n", numDevices);
+    for (int i = 0; i < numDevices; i++) {
+        const char *vendor = eglQueryDeviceStringEXT(devices[i], EGL_VENDOR);
+        const char *extensions = eglQueryDeviceStringEXT(devices[i], EGL_EXTENSIONS);
+        RENDERER_LOG("Device %d vendor: %s\n", i, vendor ? vendor : "unknown");
+        RENDERER_LOG("Device %d extensions: %s\n", i, extensions ? extensions : "unknown");
+    }
+
+    EGLDisplay connection = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, devices[0], 0);
+
+    // EGLDisplay connection = eglGetDisplay(eglDpy);
+
     RENDERER_ASSERT(connection != EGL_NO_DISPLAY, "EGL couldn't find any valid display connections.");
 
     EGLBoolean initalisationSuccess = eglInitialize(connection, NULL, NULL);
@@ -77,6 +108,9 @@ SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
     EGLSurface offscreen_surface = eglCreatePbufferSurface(connection,config,offscreen_buffer_attributes);
     RENDERER_ASSERT(offscreen_surface != EGL_NO_SURFACE, "Can't create an offscreen surface.");
 
+
+
+    
     EGLBoolean context_creation_success = eglMakeCurrent(connection, offscreen_surface, offscreen_surface, context);
     RENDERER_ASSERT(context_creation_success, "Coudn't make EGL context current.");
 
