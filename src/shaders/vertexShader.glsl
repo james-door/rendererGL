@@ -1,13 +1,13 @@
 #version 430 core
-layout (location = 0) in vec3 posWS;
-layout (location = 1) in vec3 in_normal;
 
 uniform uint render_mode;
-#define LINE 0
-#define FLAT 1
-#define PHONG 2
+#define DEBUG 0
+#define DIFFUSE 1
 
-uniform mat4x4 mvp;
+#define VECTOR3 vec3 
+#define MATRIX4 mat4 
+
+
 
 
 // Debug
@@ -15,21 +15,22 @@ uniform mat4x4 mvp;
 #define MAX_DEBUG_AABB 10
 #define MAX_POINT_LIGHTS 1
 
-uniform vec3 debugColours[MAX_DEBUG_LINES + MAX_DEBUG_AABB];
+uniform VECTOR3 debugColours[MAX_DEBUG_LINES + MAX_DEBUG_AABB];
 out vec4 diffuse_colour;
-out vec3 debug_colour;
+out VECTOR3 debug_colour;
 
-// Paritcles
-uniform float particle_scale;
-out vec3 pos_ws;
-out vec3 normal;
-out mat4x4 model;
+
+uniform VECTOR3 point_lights_ws[MAX_POINT_LIGHTS];
+uniform float radius;
+uniform MATRIX4 view;
+uniform MATRIX4 projection;
+
 
 
 
 struct ParticleData
 {
-    vec3 position;
+    VECTOR3 position;
     vec4 colour;
 };
 
@@ -38,51 +39,55 @@ layout(std430, binding = 3) readonly buffer position_buffer
     ParticleData particle[];
 };
 
-out vec3 light_pos_ws; // only support single light for now
+out vec2 uv;
+out VECTOR3 particle_pos_vs;
 
-mat4 calculateModel(vec3 pos)
-{
-    float scale= particle_scale;
-    model = mat4(
-        scale,   0.0,     0.0,     0.0,
-        0.0,     scale,   0.0,     0.0,
-        0.0,     0.0,     scale,   0.0,
-        pos.x,   pos.y,   pos.z,   1.0
-    );
-    return model;
-}
+
+
+
 
 void main()
-{   
-  
-    if(render_mode == PHONG)
-    {
-        diffuse_colour = particle[gl_InstanceID].colour;
-        mat4 model = calculateModel(particle[gl_InstanceID].position);
-        
-        gl_Position = mvp * model * vec4(posWS, 1.0);
-        pos_ws = vec3(model * vec4(posWS, 1.0));
-        normal = in_normal;
-        // light_pos_ws = point_light_pos[0];
-        light_pos_ws = vec3(3.0,3.0,3.0);
+{
+    vec4 pos = vec4(0.0, 0.0, 0.0, 1.0);
+    int point_idx = gl_VertexID / 6;
 
+
+    if(render_mode == DEBUG)
+        pos =  vec4(point_lights_ws[point_idx], 1.0);
+
+
+    else if(render_mode == DIFFUSE)
+    {
+        pos = vec4(particle[point_idx].position, 1.0);
+        diffuse_colour = particle[point_idx].colour;
+
+        particle_pos_vs = VECTOR3(view * pos);
     }
 
-    // if(render_mode == FLAT)
-    // {
-    //     mat4 model = calculateModel(point_light_pos[gl_InstanceID]);
-    //     gl_Position = mvp * model * vec4(posWS, 1.0);
-    //     debug_colour = vec3(1.0f, 1.0f, 1.0f);
-    // }
-    if(render_mode == LINE)
-    {
-        gl_Position = mvp * vec4(posWS,1.0);
-        const int nVertsPerLine = 2;
-        const int nVertsPerAABB = 24;
-        int index = (gl_VertexID < MAX_DEBUG_LINES * nVertsPerLine)
-            ? gl_VertexID / nVertsPerLine
-            : MAX_DEBUG_LINES + (gl_VertexID - MAX_DEBUG_LINES * nVertsPerLine) / nVertsPerAABB;
-        debug_colour = debugColours[index];
-    }
 
+    const int indices[6] = {0, 2, 1, 2, 3, 1};
+
+    const vec2 quad_uv[4] = {
+                                vec2(1.0, -1.0), //  br
+                                vec2(1.0, 1.0), //  tr
+                                vec2(-1.0, -1.0), //  bl
+                                vec2(-1.0, 1.0)  //  tl
+                            };
+
+
+    float rx = radius;
+    float ry = radius;
+    MATRIX4 view_to_world_transform = inverse(view);
+    vec4 x = view_to_world_transform[0];
+    vec4 y = view_to_world_transform[1];
+    vec4 quad_pos[4] = {
+                            vec4(pos + rx * x - ry * y), //  br
+                            vec4(pos + rx * x + ry * y), //  tr
+                            vec4(pos - rx * x - ry * y), //  bl
+                            vec4(pos - rx * x + ry * y)  //  tl
+                        };
+
+    int quad_idx = indices[gl_VertexID % 6];
+    gl_Position =  projection * view * quad_pos[quad_idx];
+    uv = quad_uv[quad_idx];
 }

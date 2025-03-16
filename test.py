@@ -288,7 +288,7 @@ def main():
     material_colors[JELLY] = material_colors[JELLY]
     set_color_by_material(np.array(material_colors, dtype=np.float32))
 
-    max_frames = 1
+    max_frames = 1000
     while frame_id < max_frames:
 
         if not paused:
@@ -298,7 +298,7 @@ def main():
         colors_used = F_colors_random if use_random_colors else F_colors
         F_x_np = F_x.to_numpy()
         colors_used_np = colors_used.to_numpy()
-        renderer.particles(F_x_np, colors_used_np, 0.001)
+        renderer.particles(F_x_np, colors_used_np, 0.01)
         test = renderer.getImageRGB()
         imsave("test.png",test)
 

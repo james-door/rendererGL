@@ -5,10 +5,8 @@
 
 
 //TODO:
-// 1. the sphere data and shader data should be stored in .so 
 // 2. should be able to switch between double precision and single precesion in both C++ and glsl when compiling
 // 3. imposter spheres and pre-depth pass
-// 4. should be able to have a function that retuns the image as a binary blob so we can save it from python 
 // 5. support for deubg rendering lines and AABB 
 // 6. currenlt the radius will affect all particles drawn, there is no per particle nor per call radius
 // 7. support for adding point lights
@@ -187,7 +185,7 @@ struct GlRenderer
         glmath::Mat4x4 view = glmath::lookAt(camera.pos,camera.lookat,up);
 
         sortParticlesByDepth(renderer,camera.pos);
-        renderScene(renderer,projection * view);
+        renderScene(renderer, view, projection);
         eglSwapBuffers(surface_state.connection, surface_state.surface);
         std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
         // std::vector<u8> colour_buffer_flipped(surface_state.client_width * surface_state.client_height * 3);
@@ -245,7 +243,7 @@ struct GlRenderer
         glmath::Mat4x4 view = glmath::lookAt(camera.pos,camera.lookat,up);
 
         sortParticlesByDepth(renderer,camera.pos);
-        renderScene(renderer,projection * view);
+        renderScene(renderer, view, projection);
         eglSwapBuffers(surface_state.connection, surface_state.surface);
         std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
 
@@ -302,7 +300,7 @@ int main()
 
     renderer.setCamera(pos, lookat);
 
-    renderer.particles(points, colour, 0.0001);
+    renderer.particles(points, colour, 0.01);
     renderer.show("test.png");
 
 

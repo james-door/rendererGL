@@ -7,11 +7,14 @@
 
 namespace glmath
 {
+
     constexpr f32 PI = 3.14159265359f; //use std numerics instead
     bool approxEqual(f32 v1, f32 v2, f32 eps)
     {
         return (abs(v1 - v2) < eps);
     }
+
+    struct Vec4;
 
     struct Vec3
     {
@@ -29,11 +32,47 @@ namespace glmath
             f32 data[3];
         };
         Vec3() = default;
-        constexpr Vec3(f32 xp, f32 yp, f32 zp) : x(xp), y(yp), z(zp) {};
-
-        constexpr Vec3(f32 v) : x(v), y(v), z(v) {};
+        constexpr Vec3(f32 xp, f32 yp, f32 zp);
+        constexpr Vec3(f32 v);
+        Vec3(const Vec4 &v);
     };
 
+
+    struct Vec4
+    {
+        union
+        {
+            
+            struct
+            {
+                f32 x,y,z,w;
+            };
+            struct
+            {
+                f32 r,g,b,a;
+            };
+            f32 data[4];
+        };
+        Vec4() = default;
+        constexpr Vec4(f32 xp, f32 yp, f32 zp, f32 wp);
+        constexpr Vec4(f32 v);
+        constexpr Vec4(Vec3 v, f32 wp);
+    };
+    
+
+    // Vec3 constructors
+    constexpr Vec3::Vec3(f32 xp, f32 yp, f32 zp) : x(xp), y(yp), z(zp) {};
+    constexpr Vec3::Vec3(f32 v) : x(v), y(v), z(v) {}
+    Vec3::Vec3(const Vec4& v) : x(v.x), y(v.y), z(v.z) {}
+
+    // Vec4 constructors
+    constexpr Vec4::Vec4(f32 xp, f32 yp, f32 zp, f32 wp) : x(xp), y(yp), z(zp), w(wp) {};
+    constexpr Vec4::Vec4(f32 v) : x(v), y(v), z(v), w(v) {};
+    constexpr Vec4::Vec4(Vec3 v, f32 wp) : x(v.x), y(v.y), z(v.z), w(wp) {};
+
+
+
+    //Vec3 operators
     Vec3 operator/(const Vec3 &lhs,const f32 &rhs )
     {
         return {lhs.x / rhs,
@@ -74,13 +113,10 @@ namespace glmath
     {
         return {vec.x * scale, vec.y * scale, vec.z * scale};
     }
-
-
     f32 dot(const Vec3 &v1, const Vec3 &v2)
     {
         return v1.x * v2.x +  v1.y * v2.y +  v1.z * v2.z;
     }
-
     Vec3 normalise(const Vec3 &v)
     {
         return ( v / sqrt(dot(v,v)));
@@ -89,7 +125,6 @@ namespace glmath
     {
         return sqrt(dot(v,v));
     }
-
     Vec3 cross(const Vec3 &v1,const Vec3 &v2 )
     {
         Vec3 result;
@@ -98,7 +133,6 @@ namespace glmath
         result.z = v1.x*v2.y - v1.y*v2.x;
         return result;
     }
-
     Vec3 operator/(const Vec3 &v, f32 q)
     {
         Vec3 result;
@@ -107,7 +141,26 @@ namespace glmath
         result.z = v.z / q;
         return result;
     }
-    
+
+
+
+
+    // Vec4 operators
+    Vec4 operator+(const Vec4 &lhs,const Vec4 &rhs )
+    {
+        return {lhs.x + rhs.x,
+                lhs.y + rhs.y,
+                lhs.z + rhs.z,
+                lhs.w + rhs.w, 
+                };
+    }
+
+
+
+
+
+
+
     struct Vec2
     {
         union
@@ -179,34 +232,7 @@ namespace glmath
 
 
 
-    struct Vec4
-    {
-        union
-        {
-            
-            struct
-            {
-                f32 x,y,z,w;
-            };
-            struct
-            {
-                f32 r,g,b,a;
-            };
-            f32 data[4];
-        };
-        Vec4() = default;
-        Vec4(f32 xp, f32 yp, f32 zp, f32 wp) : x(xp), y(yp), z(zp), w(wp) {};
-        Vec4(f32 v) : x(v), y(v), z(v), w(v) {};
-    };
-    
-    Vec4 operator+(const Vec4 &lhs,const Vec4 &rhs )
-    {
-        return {lhs.x + rhs.x,
-                lhs.y + rhs.y,
-                lhs.z + rhs.z,
-                lhs.w + rhs.w, 
-                };
-    }
+
 
 
 

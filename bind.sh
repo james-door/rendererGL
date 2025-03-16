@@ -13,11 +13,9 @@ fi
 mkdir -p $build_dir
 
 pushd $build_dir
-ln -sf ../../data/spherePosNormalTriangulated.ply .
 ln -sf ../../src/shaders/vertexShader.glsl .
 ln -sf ../../src/shaders/fragmentShader.glsl .
 
-objcopy --input binary --output elf64-x86-64 --binary-architecture i386:x86-64 spherePosNormalTriangulated.ply sphere_data.o
 objcopy --input binary --output elf64-x86-64 --binary-architecture i386:x86-64 vertexShader.glsl vertex_shader_data.o
 objcopy --input binary --output elf64-x86-64 --binary-architecture i386:x86-64 fragmentShader.glsl fragment_shader_data.o
 popd

@@ -30,7 +30,7 @@ elseif(DISPLAY_TYPE STREQUAL "EGL")
 
 
 
-nanobind_add_module(glrendererEGL src/glrendererEGL.cpp  src/external/glad.c sphere_data.o vertex_shader_data.o fragment_shader_data.o)
+nanobind_add_module(glrendererEGL src/glrendererEGL.cpp  src/external/glad.c vertex_shader_data.o fragment_shader_data.o)
 
 target_include_directories(glrendererEGL PRIVATE src/external)
 find_package(OpenGL REQUIRED EGL OpenGL)

@@ -19,7 +19,6 @@
 
 
 
-#define SOFTZOO_CODEBASE 0
 
 
 
@@ -246,27 +245,29 @@ struct Renderer
     // std::span<ParticleData> particle_data;
     // std::span<glmath::Vec4> light_pos;
     std::vector<ParticleData> particle_data;
-    // std::array<glmath::Vec3, MAX_POINT_LIGHTS> light_pos;
+    std::array<glmath::Vec3, MAX_POINT_LIGHTS> light_pos;
 
     i64 dynamic_sso_capacity;
     u32 dynamic_sso;
 
     u32 debug_vao;
-    u32 sphere_vao; 
+    u32 dummy_vao; 
 
     i32 debug_colours_uniform;
 
     i32 shader_program;
+
     i32 render_mode_uniform;
-    i32 mvp_uniform;
-    i32 particle_scale_uniform;
+    i32 projection_uniform;
+    i32 view_uniform;
+    i32 point_light_uniform;
+
+    i32 particle_radius_uniform;
 };
 
 
 
 
-extern char _binary_spherePosNormalTriangulated_ply_start;
-extern char _binary_spherePosNormalTriangulated_ply_end;
 extern char _binary_vertexShader_glsl_start;
 extern char _binary_vertexShader_glsl_end;
 extern char _binary_fragmentShader_glsl_start;
@@ -294,45 +295,11 @@ i32 initialiseRenderer(Renderer &render_manager)
 {
     // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
 
-    // load sphere to vram
-    StackArena sphere_data {1024 * 100}; // NOTE: 50 KiB is over allocation
+    StackArena shader_data {1024 * 10}; // NOTE: 10 KiB is over allocation
     ModelMetaData metaData;
 
-    metaData.blob = loadBlobFromBinary(sphere_data,_binary_spherePosNormalTriangulated_ply_start, _binary_spherePosNormalTriangulated_ply_end);
-
-    getPlyMetaData(metaData);
-    i64 vertex_data_size = metaData.nVerts * sizeof(VertexPosNormal);
-    i64 index_data_size = metaData.nTriangles * 3  * sizeof(i32);
-    SubArena vertex_data{sphere_data,vertex_data_size};
-    SubArena index_data{sphere_data, index_data_size};
-
-    loadPlyModelPos(vertex_data,index_data,metaData);
-
-
-    u32 sphere_vbo; // Lifetime, don't store it as it won't be deallocated
-    u32 sphere_ebo; // Lifetime, don't store it as it won't be deallocated
-    glGenBuffers(1, &sphere_vbo);
-    glGenBuffers(1, &sphere_ebo);
-    glGenVertexArrays(1, &render_manager.sphere_vao);
+    glGenVertexArrays(1, &render_manager.dummy_vao);
     
-    glBindVertexArray(render_manager.sphere_vao);
-
-    glBindBuffer(GL_ARRAY_BUFFER,sphere_vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertex_data.offset, vertex_data.start,GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,sphere_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,index_data.offset,index_data.start,GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3,GL_FLOAT,GL_FALSE,sizeof(VertexPosNormal), reinterpret_cast<void*>(0));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3,GL_FLOAT,GL_FALSE,sizeof(VertexPosNormal), reinterpret_cast<void*>(sizeof(glmath::Vec3)));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
-  
-
-    // load debug data to vram
-
-
-
 
     constexpr i32 point_light_size = MAX_POINT_LIGHTS * sizeof(glmath::Vec4);
     constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
@@ -375,11 +342,11 @@ i32 initialiseRenderer(Renderer &render_manager)
     glBindVertexArray(0);
 
 
-    auto vert_blob = loadBlobFromBinary(sphere_data, _binary_vertexShader_glsl_start, _binary_vertexShader_glsl_end);
-    auto frag_blob = loadBlobFromBinary(sphere_data, _binary_fragmentShader_glsl_start, _binary_fragmentShader_glsl_end);
+    auto vert_blob = loadBlobFromBinary(shader_data, _binary_vertexShader_glsl_start, _binary_vertexShader_glsl_end);
+    auto frag_blob = loadBlobFromBinary(shader_data, _binary_fragmentShader_glsl_start, _binary_fragmentShader_glsl_end);
     i64 vsObj = compileShader(vert_blob, GL_VERTEX_SHADER);
     i64 fsObj = compileShader(frag_blob, GL_FRAGMENT_SHADER);
-    RENDERER_ASSERT(vsObj != -1 && vsObj != -1, "Failed to compile shaders.");
+    RENDERER_ASSERT(vsObj != -1 && fsObj != -1, "Failed to compile shaders.");
 
     
     render_manager.shader_program = glCreateProgram();
@@ -399,18 +366,22 @@ i32 initialiseRenderer(Renderer &render_manager)
         return -1;
     }
 
-    render_manager.mvp_uniform = glGetUniformLocation(render_manager.shader_program,"mvp");
+    render_manager.projection_uniform = glGetUniformLocation(render_manager.shader_program,"projection");
+    render_manager.view_uniform = glGetUniformLocation(render_manager.shader_program,"view");
+    render_manager.point_light_uniform = glGetUniformLocation(render_manager.shader_program,"point_lights_ws");
+
+
     // assert(render_manager.mvp_uniform != -1);
     render_manager.render_mode_uniform = glGetUniformLocation(render_manager.shader_program,"render_mode");
-    // assert(render_manager.render_mode_uniform != -1);
-    render_manager.particle_scale_uniform = glGetUniformLocation(render_manager.shader_program,"particle_scale");
+    assert(render_manager.render_mode_uniform != -1);
+    render_manager.particle_radius_uniform = glGetUniformLocation(render_manager.shader_program,"radius");
     // assert(render_manager.particle_scale_uniform != -1);
     render_manager.debug_colours_uniform = glGetUniformLocation(render_manager.shader_program,"debugColours");
     // assert(render_manager.debug_colours_uniform != -1);
 
     // Set shader defaults
     glUseProgram(render_manager.shader_program);
-    glUniform1f(render_manager.particle_scale_uniform, 0.005f);
+    glUniform1f(render_manager.particle_radius_uniform, 0.005f);
 
 
 
@@ -422,7 +393,7 @@ i32 initialiseRenderer(Renderer &render_manager)
 
 void sortParticlesByDepth(Renderer &renderer, const glmath::Vec3 &camera_pos)
 {
-
+    
     std::sort(renderer.particle_data.begin(), renderer.particle_data.end(), [camera_pos](const ParticleData &a, const ParticleData &b)
     {
         float distance_a = 0;
@@ -466,25 +437,46 @@ void uploadAndRenderParticles(Renderer & renderer)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,0);
 
 
-    glBindVertexArray(renderer.sphere_vao);
-    glDrawElementsInstanced(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0), renderer.particle_data.size()); 
-    glBindVertexArray(0);
+    // glDrawElementsInstanced(GL_TRIANGLES, 960 * 3, GL_UNSIGNED_INT, (void*)(0), renderer.particle_data.size());
+
+
+    glUniform1ui(renderer.render_mode_uniform, 1);
+    glDrawArrays(GL_TRIANGLES,0,6 * renderer.particle_data.size());
+
     
     renderer.particle_data.clear();
-    // renderer.particle_data.resize(0);
 }
 
-void renderScene(Renderer & renderer, const glmath::Mat4x4 &mvp)
+void renderScene(Renderer & renderer, const glmath::Mat4x4 &view, const glmath::Mat4x4 &projection)
 {
     // RENDERER_ASSERT(glXGetCurrentContext() != nullptr, "Called on thread without a valid context.");
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(renderer.shader_program);
-    glUniformMatrix4fv(renderer.mvp_uniform, 1, false, mvp.data[0]);
-    glUniform1ui(renderer.render_mode_uniform,2);
+    glUniformMatrix4fv(renderer.projection_uniform, 1, false, projection.data[0]);
+    glUniformMatrix4fv(renderer.view_uniform, 1, false, view.data[0]);
+
+    renderer.light_pos[0] = glmath::Vec3(3.0, 3.0, 3.0);
+
+
+
+    for(i32 i =0; i < 1; ++i)
+    {
+        renderer.light_pos[0] = glmath::Vec3(view * glmath::Vec4(renderer.light_pos[0], 1.0f)); 
+    }
+
+    glUniform3fv(renderer.point_light_uniform, MAX_POINT_LIGHTS, renderer.light_pos[0].data);
+
+
+
+    glBindVertexArray(renderer.dummy_vao);
+    
+    glUniform1ui(renderer.render_mode_uniform, 0);
+    glDrawArrays(GL_TRIANGLES,0,6);
 
 
     uploadAndRenderParticles(renderer);
+    glBindVertexArray(0);
 
     // glUniform1ui(renderer.render_mode_uniform,0);
     // constexpr i32 nDebugEntites = MAX_DEBUG_AABB + MAX_DEBUG_LINES;
@@ -494,7 +486,7 @@ void renderScene(Renderer & renderer, const glmath::Mat4x4 &mvp)
 
 void setRadius(const Renderer &renderer, f32 radius)
 {
-    glUniform1f(renderer.particle_scale_uniform, radius);
+    glUniform1f(renderer.particle_radius_uniform, radius);
 }
 
 

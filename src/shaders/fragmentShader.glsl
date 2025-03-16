@@ -1,84 +1,73 @@
 #version 430 core
 
+#define MAX_POINT_LIGHTS 1
+
+
+#define VECTOR3 vec3 
+#define MATRIX4 mat4 
+
 uniform uint render_mode;
-#define LINE 0
-#define FLAT 1
-#define PHONG 2
+#define DEBUG 0
+#define DIFFUSE 1
 
 
 out vec4 colour;
 
+in vec2 uv;
+in VECTOR3 particle_pos_vs;
 in vec4 diffuse_colour;
-in vec3 debug_colour;
-in vec3 pos_ws;
-in vec3 normal;
 
 
-uniform vec3 camera_pos_ws;
-in vec3 light_pos_ws; // only support single light for now
-in mat4x4 model;
+uniform VECTOR3 camera_pos_ws;
+uniform float radius;
 
 
-vec3 goochDiffuse(vec3 normal, vec3 lightDir, vec3 lightColour, vec3 diffuseColour)
+uniform VECTOR3 point_lights_ws[MAX_POINT_LIGHTS];
+
+VECTOR3 diffuseColour(VECTOR3 normal, VECTOR3 light_dir, VECTOR3 colour)
 {
-    vec3 warm = vec3(0.3, 0.3, 0);
-    vec3 cool = vec3(0, 0, 0.55);
-
-    float alpha = 0.4;
-    float beta = 0.8;
-    
-    vec3 k_cool = cool + alpha * diffuseColour;
-    vec3 k_warm = warm + beta * diffuseColour;
-
-
-    float t = 1.0 + dot(normal,lightDir) / 2.0;
-    vec3 diffuse = t * k_warm + (1.0 - t) * k_cool;
-    return diffuse;
+    const VECTOR3 light_colour = VECTOR3(1.0, 1.0, 1.0);
+    float t = max(dot(normal, light_dir), 0.0);
+    return light_colour * colour * t;
 }
 
-
-// All vectors should be normalised
-vec3 diffuseReflection(vec3 normal, vec3 lightDir, vec3 lightColour, vec3 diffuseColour, vec3 ambientColour)
-{
-    vec3 directColour = lightColour * max(dot(normal, lightDir), 0);
-    return ((ambientColour + directColour) * diffuseColour);
-}
-
-// All vectors should be normalised
-vec3 specularReflection(vec3 normal, vec3 lightDir, vec3 viewDir,float shininess, vec3 lightColour,vec3 specularColour)
-{
-    vec3 reflectedColour = lightColour * pow(max(dot(reflect(lightDir,normal),viewDir),0.0),shininess);
-
-    return (reflectedColour * specularColour);
-}
 
 
 void main()
 {
-    if(render_mode == LINE)
-        colour = vec4(debug_colour, 1.0);
-    if(render_mode == FLAT)
-        colour = vec4(1.0,1.0,1.0,1.0);
-    if(render_mode == PHONG)
+    // colour =  vec4(1.0,1.0,1.0,1.0);
+    // return;
+    float length_squared = dot(uv,uv);
+
+    if(length_squared > 1.0)
+        discard;
+
+
+    if(render_mode == DEBUG)
+        colour = vec4(1.0,1.0,1.0, 1.0);
+        
+    else if(render_mode == DIFFUSE)
     {
-        vec3 lightColour = vec3(1.0, 1.0, 1.0);
-        vec3 diffuseColour = vec3(diffuse_colour); // pre-multiply by pi
-        float alpha = diffuse_colour.w;
-        // vec3 specularColour = vec3(1.0,1.0,1.0);
-        // float shininess = 10.0;
+        const VECTOR3 particle_colour = VECTOR3(1.0, 0.0, 0.0);
+
+        //asume one light 
+        // VECTOR3 light_pos_vs = VECTOR3(view * vec4(point_lights_ws[0], 1.0));
+        VECTOR3 light_pos_vs = point_lights_ws[0];
+
+
+        VECTOR3 normal_with_z =  VECTOR3(uv, -sqrt(1.0 - length_squared));
+
+        VECTOR3 frag_pos_vs = radius * normal_with_z + particle_pos_vs;
         
-        mat3x3 tempTransform = mat3x3(transpose(inverse(model)));
+        VECTOR3 light_dir = normalize(light_pos_vs - frag_pos_vs);
 
-        vec3 n = normalize(tempTransform * normal);
 
-        vec3 fragPos = pos_ws;
-        vec3 lightDir = normalize(light_pos_ws - fragPos);
-        vec3 viewDir = normalize(fragPos - camera_pos_ws);
+        VECTOR3 diffuse_rgb = VECTOR3(diffuse_colour);
+        float diffuse_alpha = diffuse_colour.w;
 
-        vec3 diffuse = goochDiffuse(n,lightDir,lightColour,diffuseColour);
-
-        // vec3 specular = specularReflection(n,lightDir,viewDir,shininess,lightColour,specularColour);
-        colour = vec4((diffuse), alpha);
+        VECTOR3 diffuse = diffuseColour(normal_with_z, light_dir, diffuse_rgb);
         
+        colour = vec4(diffuse, diffuse_alpha);
+
     }
 }

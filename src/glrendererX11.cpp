@@ -1,6 +1,7 @@
 // BUGS:
 // 1. Breaks most of the time when using debugpy
 
+#define PYTHON_BINDING 0
 
 #if PYTHON_BINDING
 #include <nanobind/nanobind.h>
@@ -240,11 +241,14 @@ struct GlRenderer
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+        
+        // glEnable(GL_CULL_FACE);
+        // glCullFace(GL_BACK);
+        // glFrontFace(GL_CCW);
+        glDisable(GL_CULL_FACE);
+        
+        glClearColor(0.0,1.0,0.0,1.0);
 
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        glFrontFace(GL_CW);
-        glClearColor(1.0,1.0,1.0,1.0);
         glViewport(0, 0, surface_state.client_width, surface_state.client_height);
         
         
@@ -306,8 +310,12 @@ struct GlRenderer
         glClearColor(np_colour(0), np_colour(1), np_colour(2),1.0);
     }
 #else
-    void particles(const std::vector<glmath::Vec3> &centres, const std::vector<glmath::Vec4> &colours)
+    void particles(const std::vector<glmath::Vec3> &centres, const std::vector<glmath::Vec4> &colours, f32 radius)
     {
+        // set the radius for all particles in the frame, should really just be for this call
+        setRadius(renderer,radius);
+
+
         i64 points_to_allocate = centres.size();
         for (i64 i = 0; i < points_to_allocate; ++i)
         {
@@ -328,10 +336,12 @@ struct GlRenderer
 #endif
 
 
-
-
     void show()
     {
+        static i64 count = 0;
+        static f64 avg_frame_time = 0.0;
+        const auto frame_start= std::chrono::steady_clock::now();
+
         constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
         constexpr f32 near_plane = 0.1f;
         constexpr f32 far_plane  = 1000.f;
@@ -339,13 +349,21 @@ struct GlRenderer
         glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
 
 
+        static std::vector<f32> depth_scratch_buffer(1000000);
+        
+        // sortParticlesByDepth(renderer,camera.pos, depth_scratch_buffer);
+        // renderer.particle_data.clear();
 
-        sortParticlesByDepth(renderer,camera.pos);
-        renderScene(renderer,projection * camera.view);
-
+        renderScene(renderer, camera.view, projection);
         glXSwapBuffers(surface_state.connection, surface_state.window);
 
+        const auto frame_end = std::chrono::steady_clock::now();
+        const std::chrono::duration<double> frame_duration = frame_end - frame_start;
+        avg_frame_time += frame_duration.count() * 1000.0;
+        ++count;
 
+        if(count % 10 ==0)
+            RENDERER_LOG("Frame Time: %fms",avg_frame_time / static_cast<f64>(count));
     }
     void logDiagnostics();
 };
@@ -369,24 +387,13 @@ NB_MODULE(glrendererX11, m) {
 #else
 
 
-extern char _binary_spherePosNormalTriangulated_ply_start;
-// extern char _binary_spherePosNormalTriangulated_ply_end;
-// std::string_view loadSphere(StackArena &arena)
-// {
-//     const char *blob_start = &_binary_spherePosNormalTriangulated_ply_start;
-//     const char *blob_end = &_binary_spherePosNormalTriangulated_ply_end;
-//     // i64 size = std::bit_cast<intptr_t, char*>(blob_end) -std::bit_cast<intptr_t, char*>(blob_start);
-//     // assert(size > 0 );
-//     return {};
-// }
-
 int main()
 {
 
         srand(20);
         
         i32 dim = 3;
-        i32 n_points = 100000;
+        i32 n_points = 1000000;
         std::vector<glmath::Vec3> points;
         std::vector<glmath::Vec4> colour;
         points.resize(n_points);
@@ -416,13 +423,9 @@ int main()
 
     while(!renderer.windowIsClosed())
     {
-        // for(i32 i = 0; i < 100; ++i)
-        // {
-        //     points.push_back({static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX)});
-        // }
   
         renderer.processWindowInput();
-        renderer.particles(points, colour);
+        renderer.particles(points, colour, 0.05);
         renderer.show();
     }
 
