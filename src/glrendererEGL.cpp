@@ -163,7 +163,7 @@ struct GlRenderer
 
 
 
-// #define PYTHON_BINDING 1
+#define PYTHON_BINDING 1
 #if PYTHON_BINDING
     void particles(nanobind::ndarray<f32, nanobind::shape<-1, 3>>& centres, nanobind::ndarray<f32, nanobind::shape<-1, 4>>& colours, f32 radius)
     {
@@ -212,22 +212,26 @@ struct GlRenderer
         renderScene(renderer, view, projection);
         eglSwapBuffers(surface_state.connection, surface_state.surface);
         std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
-        // std::vector<u8> colour_buffer_flipped(surface_state.client_width * surface_state.client_height * 3);
+        std::vector<u8> colour_buffer_flipped(surface_state.client_width * surface_state.client_height * 3);
         i32 n_channels= 3;
-        // i32 pitch = surface_state.client_width * n_channels;
+        i32 pitch = surface_state.client_width * n_channels;
+        i32 height = surface_state.client_height * n_channels;
+
         // i32 n_rows = surface_state.client_height;
         // i32 n_columns = surface_state.client_width;
         glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
 
-        // for(i32 i = 0; i < n_rows; ++i)
-        // {
-        //     for(i32 j =0; j < n_columns; ++j)
-        //     {
-        //         colour_buffer_flipped[i + j*pitch] = colour_buffer[i*pitch + j];
-        //     }
-        // }
+        for (i32 i = 0; i < surface_state.client_width * surface_state.client_height * 3; ++i) {
+            i32 row = i / pitch;
+            i32 col = i % pitch;
+            colour_buffer_flipped[i] = colour_buffer[(surface_state.client_height - 1 - row) * pitch + col];
+        }
+
+
+
+
         // stbi_write_png("test.png",surface_state.client_width, surface_state.client_height ,3, colour_buffer.data(), surface_state.client_width * 3);
-        return nanobind::cast(nanobind::ndarray<u8, nanobind::numpy>(colour_buffer.data(), {static_cast<u64>(surface_state.client_height), static_cast<u64>(surface_state.client_width), static_cast<u64>(n_channels)}));
+        return nanobind::cast(nanobind::ndarray<u8, nanobind::numpy>(colour_buffer_flipped.data(), {static_cast<u64>(surface_state.client_height), static_cast<u64>(surface_state.client_width), static_cast<u64>(n_channels)}));
     }
 
 #else
@@ -268,7 +272,9 @@ struct GlRenderer
 
         sortParticlesByDepth(renderer,camera.pos);
         renderScene(renderer, view, projection);
-        eglSwapBuffers(surface_state.connection, surface_state.surface);
+        // eglSwapBuffers(surface_state.connection, surface_state.surface);
+        glFinish();
+
         std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
 
         glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());

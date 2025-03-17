@@ -1,6 +1,8 @@
 import numpy as np
 from skimage.io import imsave
 import taichi as ti
+import time
+
 
 ti.init(arch=ti.cuda)
 
@@ -297,10 +299,15 @@ def main():
 
         colors_used = F_colors_random if use_random_colors else F_colors
         F_x_np = F_x.to_numpy()
+        
+        frame_start = time.time()
         colors_used_np = colors_used.to_numpy()
         renderer.particles(F_x_np, colors_used_np, 0.01)
         test = renderer.getImageRGB()
         imsave("test.png",test)
+        frame_end = time.time()
+        print(f"Frame time: {frame_end - frame_start}s")
+
 
         frame_id +=1
         

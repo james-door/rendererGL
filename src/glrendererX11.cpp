@@ -104,8 +104,6 @@ SurfaceState createSurfaceAndContext()
 
 
 
-
-
 struct Camera
 {
     glmath::Mat4x4 view;
