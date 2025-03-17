@@ -1,22 +1,12 @@
 // BUGS:
 // 1. X11 Breaks most of the time when using debugpy
-// 2. blue rendering as green... colour spaces ect
-
-
-
 //TODO:
-// 1. support no x-forwading using EGL_PLATFORM_SURFACELESS_MESA this requires 
-        // EGL_EXT_device_enumeration
-        // EGL_EXT_device_query
-        // EGL_EXT_platform_base
-        // EGL_EXT_platform_device
         
 // 2. should be able to switch between double precision and single precesion in both C++ and glsl when compiling
 // 3. imposter spheres and pre-depth pass
 // 5. support for deubg rendering lines and AABB 
-// 6. currenlt the radius will affect all particles drawn, there is no per particle nor per call radius
+// 6. currently the radius will affect all particles drawn, there is no per particle nor per call radius
 // 7. support for adding point lights
-
 
 // FUTURE:
 // 1. support for "Headless" x11 rendering
@@ -307,7 +297,7 @@ int main()
         srand(20);
         
         i32 dim = 3;
-        i32 n_points = 100000;
+        i32 n_points = 1000;
         std::vector<glmath::Vec3> points;
         std::vector<glmath::Vec4> colour;
         points.resize(n_points);
@@ -320,9 +310,9 @@ int main()
 
             float transparent = static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX);
             if(transparent < 0.5)
-                colour[i] = {1.0, 0.0, 0.0, 1.0};
+                colour[i] = {0.925, 0.329, 0.231, 1.0};
             else
-                colour[i] = {0.0, 0.0, 1.0, 0.3};
+                colour[i] = {0.023, 0.522, 0.490, 0.2};
 
         }   
 

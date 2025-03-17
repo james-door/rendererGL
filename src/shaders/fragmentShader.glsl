@@ -31,6 +31,14 @@ VECTOR3 diffuseColour(VECTOR3 normal, VECTOR3 light_dir, VECTOR3 colour)
     return light_colour * colour * t;
 }
 
+VECTOR3 ambientColour(VECTOR3 colour)
+{
+    const VECTOR3 light_colour = VECTOR3(1.0, 1.0, 1.0);
+    const float ambient_factor = 0.3;
+    return light_colour * ambient_factor * colour;
+}
+
+
 VECTOR3 goochDiffuse(VECTOR3 normal, VECTOR3 light_dir, VECTOR3 colour)
 {
     const VECTOR3 light_colour = VECTOR3(1.0, 1.0, 1.0);
@@ -78,12 +86,13 @@ void main()
         VECTOR3 light_dir = normalize(light_pos_vs - frag_pos_vs);
 
 
-        VECTOR3 diffuse_rgb = VECTOR3(diffuse_colour);
-        float diffuse_alpha = diffuse_colour.w;
+        VECTOR3 particle_rgb = VECTOR3(diffuse_colour);
+        float particle_alpha = diffuse_colour.w;
 
-        VECTOR3 diffuse = goochDiffuse(normal_with_z, light_dir, diffuse_rgb);
-        
-        colour = vec4(diffuse, diffuse_alpha);
+        VECTOR3 diffuse = diffuseColour(normal_with_z, light_dir, particle_rgb);
+        VECTOR3 ambient = ambientColour(particle_rgb);
+
+        colour = vec4(diffuse + ambient, particle_alpha);
 
     }
 }

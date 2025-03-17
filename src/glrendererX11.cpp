@@ -247,7 +247,7 @@ struct GlRenderer
         // glFrontFace(GL_CCW);
         glDisable(GL_CULL_FACE);
         
-        glClearColor(0.0,1.0,0.0,1.0);
+        glClearColor(1.0,1.0,1.0,1.0);
 
         glViewport(0, 0, surface_state.client_width, surface_state.client_height);
         
@@ -351,8 +351,7 @@ struct GlRenderer
 
         static std::vector<f32> depth_scratch_buffer(1000000);
         
-        // sortParticlesByDepth(renderer,camera.pos, depth_scratch_buffer);
-        // renderer.particle_data.clear();
+        sortParticlesByDepth(renderer,camera.pos);
 
         renderScene(renderer, camera.view, projection);
         glXSwapBuffers(surface_state.connection, surface_state.window);
@@ -393,7 +392,7 @@ int main()
         srand(20);
         
         i32 dim = 3;
-        i32 n_points = 1000000;
+        i32 n_points = 10000;
         std::vector<glmath::Vec3> points;
         std::vector<glmath::Vec4> colour;
         points.resize(n_points);
@@ -406,12 +405,11 @@ int main()
 
             float transparent = static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX);
             if(transparent < 0.5)
-                colour[i] = {1.0, 0.0, 0.0, 1.0};
+                colour[i] = {0.925, 0.329, 0.231, 1.0};
             else
-                colour[i] = {0.0, 0.0, 1.0, 0.3};
+                colour[i] = {0.023, 0.522, 0.490, 0.2};
 
         }   
-
 
     auto renderer = GlRenderer();
 
