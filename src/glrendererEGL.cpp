@@ -210,18 +210,19 @@ struct GlRenderer
 
         sortParticlesByDepth(renderer,camera.pos);
         renderScene(renderer, view, projection);
-        eglSwapBuffers(surface_state.connection, surface_state.surface);
-        std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
-        std::vector<u8> colour_buffer_flipped(surface_state.client_width * surface_state.client_height * 3);
-        i32 n_channels= 3;
-        i32 pitch = surface_state.client_width * n_channels;
-        i32 height = surface_state.client_height * n_channels;
+        
+        // eglSwapBuffers(surface_state.connection, surface_state.surface);
+        glFlush();
 
-        // i32 n_rows = surface_state.client_height;
-        // i32 n_columns = surface_state.client_width;
+
+        i32 n_channels= 3;
+        std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * n_channels);
+        std::vector<u8> colour_buffer_flipped(surface_state.client_width * surface_state.client_height * n_channels);
+        i32 pitch = surface_state.client_width * n_channels;
+
         glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
 
-        for (i32 i = 0; i < surface_state.client_width * surface_state.client_height * 3; ++i) {
+        for (i32 i = 0; i < surface_state.client_width * surface_state.client_height * n_channels; ++i) {
             i32 row = i / pitch;
             i32 col = i % pitch;
             colour_buffer_flipped[i] = colour_buffer[(surface_state.client_height - 1 - row) * pitch + col];
