@@ -163,7 +163,7 @@ struct GlRenderer
 
 
 
-#define PYTHON_BINDING 1
+// #define PYTHON_BINDING 1
 #if PYTHON_BINDING
     void particles(nanobind::ndarray<f32, nanobind::shape<-1, 3>>& centres, nanobind::ndarray<f32, nanobind::shape<-1, 4>>& colours, f32 radius)
     {
@@ -235,6 +235,29 @@ struct GlRenderer
         return nanobind::cast(nanobind::ndarray<u8, nanobind::numpy>(colour_buffer_flipped.data(), {static_cast<u64>(surface_state.client_height), static_cast<u64>(surface_state.client_width), static_cast<u64>(n_channels)}));
     }
 
+    auto saveImageRGB(std::string path)
+    {
+        constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
+        constexpr f32 near_plane = 0.1f;
+        constexpr f32 far_plane  = 1000.f;
+        const f32 aspect_ratio = static_cast<f32>(surface_state.client_width) / static_cast<f32>(surface_state.client_height);
+        glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
+        constexpr glmath::Vec3 up = {0.0, 1.0, 0.0};
+        glmath::Mat4x4 view = glmath::lookAt(camera.pos,camera.lookat,up);
+
+        sortParticlesByDepth(renderer,camera.pos);
+        renderScene(renderer, view, projection);
+        
+        // eglSwapBuffers(surface_state.connection, surface_state.surface);
+        glFlush();
+
+        i32 n_channels = 3;
+        std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * n_channels);
+
+        glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+        stbi_write_png("test.png",surface_state.client_width, surface_state.client_height ,3, colour_buffer.data(), surface_state.client_width * 3);
+    }
+
 #else
     void particles(const std::vector<glmath::Vec3> &centres, const std::vector<glmath::Vec4> &colours, f32 radius)
     {
@@ -294,7 +317,9 @@ NB_MODULE(glrendererEGL, m) {
         .def("getImageRGB", &GlRenderer::getImageRGB)
         .def("particles", &GlRenderer::particles)
         .def("setCamera", &GlRenderer::setCamera)
-        .def("setBackgroundColour", &GlRenderer::setBackgroundColour);
+        .def("setBackgroundColour", &GlRenderer::setBackgroundColour)
+        .def("saveImageRGB", &GlRenderer::saveImageRGB);
+
 
 
 }

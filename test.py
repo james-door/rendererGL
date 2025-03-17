@@ -303,8 +303,11 @@ def main():
         frame_start = time.time()
         colors_used_np = colors_used.to_numpy()
         renderer.particles(F_x_np, colors_used_np, 0.01)
-        test = renderer.getImageRGB()
-        imsave("test.png",test)
+        
+        # test = renderer.getImageRGB()
+        # imsave("test.png",test)
+        renderer.saveImageRGB("test.png")
+        
         frame_end = time.time()
         print(f"Frame time: {frame_end - frame_start}s")
 
