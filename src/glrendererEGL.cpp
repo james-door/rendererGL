@@ -98,8 +98,6 @@ SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
     EGLSurface offscreen_surface = eglCreatePbufferSurface(connection,config,offscreen_buffer_attributes);
     RENDERER_ASSERT(offscreen_surface != EGL_NO_SURFACE, "Can't create an offscreen surface.");
 
-
-
     
     EGLBoolean context_creation_success = eglMakeCurrent(connection, offscreen_surface, offscreen_surface, context);
     RENDERER_ASSERT(context_creation_success, "Coudn't make EGL context current.");
@@ -109,6 +107,55 @@ SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
 
     return {connection, offscreen_surface,client_width, client_height};
 }
+
+
+void renderTriangle()
+{
+    RENDERER_LOG("Current Working Directory: %s", std::filesystem::current_path().c_str());
+
+
+    SurfaceState surface = createSurfaceAndContext(2000, 2000);
+
+    StackArena triangle_arena{1024 * 10};
+    auto vs = loadFile(triangle_arena, "src/shaders/triangleVS.glsl");
+    auto fs = loadFile(triangle_arena, "src/shaders/triangleFS.glsl");
+
+    auto vs_obj = compileShader(vs, GL_VERTEX_SHADER);
+    auto fs_obj = compileShader(fs, GL_FRAGMENT_SHADER);
+    RENDERER_ASSERT(vs_obj != -1 && fs_obj != -1, "Bad shader");
+
+    u32 shader_program;
+    shader_program = glCreateProgram();
+    glAttachShader(shader_program,static_cast<u32>(vs_obj));
+    glAttachShader(shader_program,static_cast<u32>(fs_obj));
+    glLinkProgram(shader_program);
+    i32 program_created;
+    glGetProgramiv(shader_program,GL_LINK_STATUS,&program_created);
+    RENDERER_ASSERT(program_created, "bad shader");
+
+    glClearColor(1.0,0.0,0.0,1.0);
+    glViewport(0, 0, 2000, 2000);
+
+
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    u32 dummy_vao;
+    glGenVertexArrays(1, &dummy_vao);
+    glBindVertexArray(dummy_vao);
+
+    glUseProgram(shader_program);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    std::vector<u8> colour_buffer(2000 * 2000 * 3);
+
+    glReadPixels(0,0,2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+    stbi_flip_vertically_on_write(true);
+    stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
+}
+
+
+
+
 
 struct Camera
 {
@@ -129,10 +176,6 @@ struct GlRenderer
         
         surface_state = createSurfaceAndContext(width, height);
 
-        i32 gl_load_status = gladLoadGLLoader((GLADloadproc)eglGetProcAddress);
-
-
-        RENDERER_ASSERT(gl_load_status == 1,"Failed to load GL with GLAD.");
         const u8 *version = glGetString(GL_VERSION);
         const char* version_cstr = reinterpret_cast<const char*>(version);
         RENDERER_LOG(version_cstr);
@@ -231,7 +274,6 @@ struct GlRenderer
 
 
 
-        // stbi_write_png("test.png",surface_state.client_width, surface_state.client_height ,3, colour_buffer.data(), surface_state.client_width * 3);
         return nanobind::cast(nanobind::ndarray<u8, nanobind::numpy>(colour_buffer_flipped.data(), {static_cast<u64>(surface_state.client_height), static_cast<u64>(surface_state.client_width), static_cast<u64>(n_channels)}));
     }
 
@@ -312,41 +354,53 @@ struct GlRenderer
 
 #if PYTHON_BINDING
 NB_MODULE(glrendererEGL, m) {
-    nanobind::class_<GlRenderer>(m, "GlRenderer")
-        .def(nanobind::init<i32, i32>())
-        .def("getImageRGB", &GlRenderer::getImageRGB)
-        .def("particles", &GlRenderer::particles)
-        .def("setCamera", &GlRenderer::setCamera)
-        .def("setBackgroundColour", &GlRenderer::setBackgroundColour)
-        .def("saveImageRGB", &GlRenderer::saveImageRGB);
-
-
-
+    m.def("renderTriangle", &renderTriangle);
+    // nanobind::class_<GlRenderer>(m, "GlRenderer")
+    //     .def(nanobind::init<i32, i32>())
+    //     .def("getImageRGB", &GlRenderer::getImageRGB)
+    //     .def("particles", &GlRenderer::particles)
+    //     .def("setCamera", &GlRenderer::setCamera)
+    //     .def("setBackgroundColour", &GlRenderer::setBackgroundColour)
+    //     .def("saveImageRGB", &GlRenderer::saveImageRGB);
 }
+
 #else
+
+
+
+
+
+
+
+
+
+
 int main()
 {
-        srand(20);
-        
-        i32 dim = 3;
-        i32 n_points = 1000;
-        std::vector<glmath::Vec3> points;
-        std::vector<glmath::Vec4> colour;
-        points.resize(n_points);
-        colour.resize(n_points);
 
-        for(i32 i = 0; i < n_points; ++i)
-        {
-            for(i32 j = 0; j < dim; ++j)
-                points[i].data[j] = (static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX));
+    renderTriangle();
+    return 0;
+    srand(20);
+    
+    i32 dim = 3;
+    i32 n_points = 1000;
+    std::vector<glmath::Vec3> points;
+    std::vector<glmath::Vec4> colour;
+    points.resize(n_points);
+    colour.resize(n_points);
 
-            float transparent = static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX);
-            if(transparent < 0.5)
-                colour[i] = {0.925, 0.329, 0.231, 1.0};
-            else
-                colour[i] = {0.023, 0.522, 0.490, 0.2};
+    for(i32 i = 0; i < n_points; ++i)
+    {
+        for(i32 j = 0; j < dim; ++j)
+            points[i].data[j] = (static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX));
 
-        }   
+        float transparent = static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX);
+        if(transparent < 0.5)
+            colour[i] = {0.925, 0.329, 0.231, 1.0};
+        else
+            colour[i] = {0.023, 0.522, 0.490, 0.2};
+
+    }   
 
 
     auto renderer = GlRenderer(2000, 2000);

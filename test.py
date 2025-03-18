@@ -272,6 +272,10 @@ def render(window, camera, scene, canvas):
 
 
 def main():
+
+    
+
+    return
     renderer = GlRenderer(2000, 2000)
     background_colour = np.array([0.0, 0.0, 0.0])
     renderer.setBackgroundColour(background_colour)
