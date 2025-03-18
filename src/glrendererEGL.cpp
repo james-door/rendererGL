@@ -109,49 +109,6 @@ SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
 }
 
 
-void renderTriangle()
-{
-    RENDERER_LOG("Current Working Directory: %s", std::filesystem::current_path().c_str());
-
-
-    SurfaceState surface = createSurfaceAndContext(2000, 2000);
-
-    StackArena triangle_arena{1024 * 10};
-    auto vs = loadFile(triangle_arena, "src/shaders/triangleVS.glsl");
-    auto fs = loadFile(triangle_arena, "src/shaders/triangleFS.glsl");
-
-    auto vs_obj = compileShader(vs, GL_VERTEX_SHADER);
-    auto fs_obj = compileShader(fs, GL_FRAGMENT_SHADER);
-    RENDERER_ASSERT(vs_obj != -1 && fs_obj != -1, "Bad shader");
-
-    u32 shader_program;
-    shader_program = glCreateProgram();
-    glAttachShader(shader_program,static_cast<u32>(vs_obj));
-    glAttachShader(shader_program,static_cast<u32>(fs_obj));
-    glLinkProgram(shader_program);
-    i32 program_created;
-    glGetProgramiv(shader_program,GL_LINK_STATUS,&program_created);
-    RENDERER_ASSERT(program_created, "bad shader");
-
-    glClearColor(1.0,0.0,0.0,1.0);
-    glViewport(0, 0, 2000, 2000);
-
-
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    u32 dummy_vao;
-    glGenVertexArrays(1, &dummy_vao);
-    glBindVertexArray(dummy_vao);
-
-    glUseProgram(shader_program);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    std::vector<u8> colour_buffer(2000 * 2000 * 3);
-
-    glReadPixels(0,0,2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-    stbi_flip_vertically_on_write(true);
-    stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
-}
 
 
 
@@ -186,9 +143,11 @@ struct GlRenderer
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+        
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         glFrontFace(GL_CW);
+
         glClearColor(1.0,1.0,1.0,1.0);
         glViewport(0, 0, surface_state.client_width, surface_state.client_height);
 
@@ -204,6 +163,49 @@ struct GlRenderer
         RENDERER_LOG(titleBarString);
     }
 
+    void renderTriangle()
+    {
+        RENDERER_LOG("Current Working Directory: %s", std::filesystem::current_path().c_str());
+
+
+        // SurfaceState surface = createSurfaceAndContext(2000, 2000);
+
+        StackArena triangle_arena{1024 * 10};
+        auto vs = loadFile(triangle_arena, "src/shaders/triangleVS.glsl");
+        auto fs = loadFile(triangle_arena, "src/shaders/triangleFS.glsl");
+
+        auto vs_obj = compileShader(vs, GL_VERTEX_SHADER);
+        auto fs_obj = compileShader(fs, GL_FRAGMENT_SHADER);
+        RENDERER_ASSERT(vs_obj != -1 && fs_obj != -1, "Bad shader");
+
+        u32 shader_program;
+        shader_program = glCreateProgram();
+        glAttachShader(shader_program,static_cast<u32>(vs_obj));
+        glAttachShader(shader_program,static_cast<u32>(fs_obj));
+        glLinkProgram(shader_program);
+        i32 program_created;
+        glGetProgramiv(shader_program,GL_LINK_STATUS,&program_created);
+        RENDERER_ASSERT(program_created, "bad shader");
+
+        glClearColor(1.0,0.0,0.0,1.0);
+        glViewport(0, 0, 2000, 2000);
+
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        u32 dummy_vao;
+        glGenVertexArrays(1, &dummy_vao);
+        glBindVertexArray(dummy_vao);
+
+        glUseProgram(shader_program);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        std::vector<u8> colour_buffer(2000 * 2000 * 3);
+
+        glReadPixels(0,0,2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+        stbi_flip_vertically_on_write(true);
+        stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
+    }
 
 
 // #define PYTHON_BINDING 1
@@ -355,13 +357,13 @@ struct GlRenderer
 #if PYTHON_BINDING
 NB_MODULE(glrendererEGL, m) {
     m.def("renderTriangle", &renderTriangle);
-    // nanobind::class_<GlRenderer>(m, "GlRenderer")
-    //     .def(nanobind::init<i32, i32>())
-    //     .def("getImageRGB", &GlRenderer::getImageRGB)
-    //     .def("particles", &GlRenderer::particles)
-    //     .def("setCamera", &GlRenderer::setCamera)
-    //     .def("setBackgroundColour", &GlRenderer::setBackgroundColour)
-    //     .def("saveImageRGB", &GlRenderer::saveImageRGB);
+    nanobind::class_<GlRenderer>(m, "GlRenderer")
+        .def(nanobind::init<i32, i32>())
+        .def("getImageRGB", &GlRenderer::getImageRGB)
+        .def("particles", &GlRenderer::particles)
+        .def("setCamera", &GlRenderer::setCamera)
+        .def("setBackgroundColour", &GlRenderer::setBackgroundColour)
+        .def("saveImageRGB", &GlRenderer::saveImageRGB);
 }
 
 #else
@@ -378,8 +380,6 @@ NB_MODULE(glrendererEGL, m) {
 int main()
 {
 
-    renderTriangle();
-    return 0;
     srand(20);
     
     i32 dim = 3;
@@ -404,6 +404,9 @@ int main()
 
 
     auto renderer = GlRenderer(2000, 2000);
+
+    renderer.renderTriangle();
+    return 0;
 
     glmath::Vec3 pos = {0.5,0.5,-2.0};
     glmath::Vec3 lookat = {0.5,0.5,0.5};

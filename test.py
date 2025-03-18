@@ -14,7 +14,6 @@ ti.init(arch=ti.cuda)
 
 
 from build.EGL.glrendererEGL import GlRenderer
-# from build.X11.glrendererX11 import GlRenderer
 
 import sys
 
@@ -275,7 +274,6 @@ def main():
 
     
 
-    return
     renderer = GlRenderer(2000, 2000)
     background_colour = np.array([0.0, 0.0, 0.0])
     renderer.setBackgroundColour(background_colour)
