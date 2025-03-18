@@ -249,6 +249,37 @@ struct GlRenderer
         stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
     }
 
+    void hardcodedTest()
+    {
+        renderer.particle_data.resize(1000);
+        srand(20);
+        for(i32 i =0 ; i < 1000; ++i)
+        {
+            glmath::Vec4 pos = {static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), 0.0};
+            glmath::Vec4 colour = {static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), 1.0};
+            renderer.particle_data[i] = {pos,colour};
+        }
+
+        constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
+        constexpr f32 near_plane = 0.1f;
+        constexpr f32 far_plane  = 1000.f;
+        const f32 aspect_ratio = static_cast<f32>(surface_state.client_width) / static_cast<f32>(surface_state.client_height);
+        glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
+        constexpr glmath::Vec3 up = {0.0, 1.0, 0.0};
+
+        glmath::Vec3 camera_pos = {0.0, 0.0, -2.0};
+        glmath::Vec3 camera_look_at = {0.0, 0.0, 0.0};
+
+        glmath::Mat4x4 view = glmath::lookAt(camera_pos, camera_look_at,up);
+
+        sortParticlesByDepth(renderer,camera.pos);
+        renderScene(renderer, view, projection);
+
+        std::vector<u8> colour_buffer(2000 * 2000 * 3);
+        glReadPixels(0,0,2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+        stbi_flip_vertically_on_write(true);
+        stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
+    }
 
 // #define PYTHON_BINDING 1
 #if PYTHON_BINDING
@@ -406,6 +437,8 @@ NB_MODULE(glrendererEGL, m) {
         .def("setCamera", &GlRenderer::setCamera)
         .def("setBackgroundColour", &GlRenderer::setBackgroundColour)
         .def("renderTriangle", &GlRenderer::renderTriangle)
+        .def("hardcodedTest", &GlRenderer::hardcodedTest)
+
         .def("saveImageRGB", &GlRenderer::saveImageRGB);
 }
 
@@ -448,7 +481,7 @@ int main()
 
     auto renderer = GlRenderer(2000, 2000);
 
-    renderer.renderTriangle();
+    renderer.hardcodedTest();
     return 0;
 
     glmath::Vec3 pos = {0.5,0.5,-2.0};

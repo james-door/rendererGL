@@ -4,7 +4,12 @@ import time
 
 
 def main():
+
+
     renderer = GlRenderer(2000, 2000)
+    renderer.hardcodedTest()
+    
+    return 
     background_colour = np.array([0.0, 0.0, 0.0])
     renderer.setBackgroundColour(background_colour)
 
