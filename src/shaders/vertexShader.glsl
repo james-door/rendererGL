@@ -59,6 +59,7 @@ void main()
     else if(render_mode == DIFFUSE)
     {
         pos = vec4(particle[point_idx].position, 1.0);
+        
         diffuse_colour = particle[point_idx].colour;
 
         particle_pos_vs = VECTOR3(view * pos);

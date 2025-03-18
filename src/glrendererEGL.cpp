@@ -249,36 +249,42 @@ struct GlRenderer
         stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
     }
 
-    void hardcodedTest()
-    {
+    void hardcodedTest() {
         renderer.particle_data.resize(1000);
         srand(20);
-        for(i32 i =0 ; i < 1000; ++i)
-        {
-            glmath::Vec4 pos = {static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), 0.0};
-            glmath::Vec4 colour = {static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), static_cast<f32>(rand()) / static_cast<f32>(RAND_MAX), 1.0};
-            renderer.particle_data[i] = {pos,colour};
-        }
+        for (auto& p : renderer.particle_data)
+            p = {glmath::Vec4{rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, 0.0},
+                glmath::Vec4{rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, 1.0}};
+        
+        glmath::Mat4x4 projection = glmath::perspectiveProjection(45.0 * glmath::PI / 180.0,
+            (f32)surface_state.client_width / surface_state.client_height, 0.1f, 1000.f);
+        glmath::Mat4x4 view = glmath::lookAt({0.0, 0.0, -2.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
+        
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glUseProgram(renderer.shader_program);
+        glUniformMatrix4fv(renderer.projection_uniform, 1, false, projection.data[0]);
+        glUniformMatrix4fv(renderer.view_uniform, 1, false, view.data[0]);
+        
+        renderer.light_pos[0] = glmath::Vec3(view * glmath::Vec4({3.0, 3.0, 3.0}, 1.0f));
+        glUniform3fv(renderer.point_light_uniform, MAX_POINT_LIGHTS, renderer.light_pos[0].data);
+        
+        glBindVertexArray(renderer.dummy_vao);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderer.dynamic_sso);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, renderer.dynamic_sso);
+        
+        glBufferData(GL_SHADER_STORAGE_BUFFER, renderer.particle_data.capacity() * sizeof(ParticleData), renderer.particle_data.data(), GL_DYNAMIC_DRAW);
+        
 
-        constexpr f32 vertical_fov = 45.0 * glmath::PI / 180.0;
-        constexpr f32 near_plane = 0.1f;
-        constexpr f32 far_plane  = 1000.f;
-        const f32 aspect_ratio = static_cast<f32>(surface_state.client_width) / static_cast<f32>(surface_state.client_height);
-        glmath::Mat4x4 projection = glmath::perspectiveProjection(vertical_fov,aspect_ratio,near_plane,far_plane);
-        constexpr glmath::Vec3 up = {0.0, 1.0, 0.0};
-
-        glmath::Vec3 camera_pos = {0.0, 0.0, -2.0};
-        glmath::Vec3 camera_look_at = {0.0, 0.0, 0.0};
-
-        glmath::Mat4x4 view = glmath::lookAt(camera_pos, camera_look_at,up);
-
-        sortParticlesByDepth(renderer,camera.pos);
-        renderScene(renderer, view, projection);
-
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        glUniform1ui(renderer.render_mode_uniform, 1);
+        glDrawArrays(GL_TRIANGLES, 0, 6 * renderer.particle_data.size());
+        
+        glBindVertexArray(0);
+        
         std::vector<u8> colour_buffer(2000 * 2000 * 3);
-        glReadPixels(0,0,2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
+        glReadPixels(0, 0, 2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
         stbi_flip_vertically_on_write(true);
-        stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
+        stbi_write_png("test.png", 2000, 2000, 3, colour_buffer.data(), 2000 * 3);
     }
 
 // #define PYTHON_BINDING 1

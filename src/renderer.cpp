@@ -322,24 +322,24 @@ i32 initialiseRenderer(Renderer &render_manager)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 
-    u32 debug_buffer; // Lifetime, don't store it as it won't be deallocated
-    glGenBuffers(1, &debug_buffer);
-    glGenVertexArrays(1, &render_manager.debug_vao);
-    constexpr i32 debug_vertex_arena_size = sizeof(DebugAABB) * MAX_DEBUG_AABB + sizeof(Line) * MAX_DEBUG_LINES;
-    const glmath::Vec3 defaultColour{1.0f, 1.0f, 1.0f};
-    render_manager.debug_render_data = SubArena(render_data,debug_vertex_arena_size);
-    render_manager.debug_lines = std::span<Line, MAX_DEBUG_LINES>{render_manager.debug_render_data.arenaPushZero<Line>(MAX_DEBUG_LINES), MAX_DEBUG_LINES};
-    render_manager.debug_aabb = std::span<DebugAABB, MAX_DEBUG_AABB>{render_manager.debug_render_data.arenaPushZero<DebugAABB>(MAX_DEBUG_AABB), MAX_DEBUG_AABB};
-    render_manager.colour = std::span<glmath::Vec3, nDebugEntites>{render_data.arenaPushZero<glmath::Vec3>(nDebugEntites), nDebugEntites};
-    for(auto &colour : render_manager.colour) colour = defaultColour;
+    // u32 debug_buffer; // Lifetime, don't store it as it won't be deallocated
+    // glGenBuffers(1, &debug_buffer);
+    // glGenVertexArrays(1, &render_manager.debug_vao);
+    // constexpr i32 debug_vertex_arena_size = sizeof(DebugAABB) * MAX_DEBUG_AABB + sizeof(Line) * MAX_DEBUG_LINES;
+    // const glmath::Vec3 defaultColour{1.0f, 1.0f, 1.0f};
+    // render_manager.debug_render_data = SubArena(render_data,debug_vertex_arena_size);
+    // render_manager.debug_lines = std::span<Line, MAX_DEBUG_LINES>{render_manager.debug_render_data.arenaPushZero<Line>(MAX_DEBUG_LINES), MAX_DEBUG_LINES};
+    // render_manager.debug_aabb = std::span<DebugAABB, MAX_DEBUG_AABB>{render_manager.debug_render_data.arenaPushZero<DebugAABB>(MAX_DEBUG_AABB), MAX_DEBUG_AABB};
+    // render_manager.colour = std::span<glmath::Vec3, nDebugEntites>{render_data.arenaPushZero<glmath::Vec3>(nDebugEntites), nDebugEntites};
+    // for(auto &colour : render_manager.colour) colour = defaultColour;
 
-    glBindVertexArray(render_manager.debug_vao);
-    glBindBuffer(GL_ARRAY_BUFFER,debug_buffer);
-    glBufferData(GL_ARRAY_BUFFER,render_manager.debug_render_data.offset, render_manager.debug_render_data.start,GL_DYNAMIC_READ);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glmath::Vec3), reinterpret_cast<void*>(0));    
-    glEnableVertexAttribArray(0);
+    // glBindVertexArray(render_manager.debug_vao);
+    // glBindBuffer(GL_ARRAY_BUFFER,debug_buffer);
+    // glBufferData(GL_ARRAY_BUFFER,render_manager.debug_render_data.offset, render_manager.debug_render_data.start,GL_DYNAMIC_READ);
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glmath::Vec3), reinterpret_cast<void*>(0));    
+    // glEnableVertexAttribArray(0);
 
-    glBindVertexArray(0);
+    // glBindVertexArray(0);
 
 
     auto vert_blob = loadBlobFromBinary(shader_data, _binary_vertexShader_glsl_start, _binary_vertexShader_glsl_end);
@@ -471,8 +471,8 @@ void renderScene(Renderer & renderer, const glmath::Mat4x4 &view, const glmath::
 
     glBindVertexArray(renderer.dummy_vao);
     
-    glUniform1ui(renderer.render_mode_uniform, 0);
-    glDrawArrays(GL_TRIANGLES,0,6);
+    // glUniform1ui(renderer.render_mode_uniform, 0);
+    // glDrawArrays(GL_TRIANGLES,0,6);
 
 
     uploadAndRenderParticles(renderer);
