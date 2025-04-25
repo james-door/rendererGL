@@ -1,18 +1,3 @@
-// BUGS:
-// 1. X11 Breaks most of the time when using debugpy
-//TODO:
-        
-// 2. should be able to switch between double precision and single precesion in both C++ and glsl when compiling
-// 3. imposter spheres and pre-depth pass
-// 5. support for deubg rendering lines and AABB 
-// 6. currently the radius will affect all particles drawn, there is no per particle nor per call radius
-// 7. support for adding point lights
-
-// FUTURE:
-// 1. support for "Headless" x11 rendering
-// 2. support for dyamic loading of opengl/egl or opengl/x11 in the same file
-
-
 #if PYTHON_BINDING
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
@@ -23,7 +8,6 @@
 #include <filesystem>
 #include <vector>
 
-// #include <EGL/egl.h>
 #include "external/glad/glad.h"
 #include "external/glad/glad_egl.h"
 
@@ -34,8 +18,6 @@
 #include "glmath.h"
 #include "renderer.cpp"
 
-
-
 struct SurfaceState
 {
     EGLDisplay connection;    
@@ -43,8 +25,6 @@ struct SurfaceState
     i32 client_width;
     i32 client_height;
 };
-
-
 
 SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
 {
@@ -58,8 +38,6 @@ SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
           EGL_NONE
   };    
     EGLint offscreen_buffer_attributes[] = {EGL_HEIGHT, client_height, EGL_WIDTH, client_width,EGL_NONE};
-
-
 
     gladLoadEGL();
     eglBindAPI(EGL_OPENGL_API);
@@ -107,51 +85,6 @@ SurfaceState createSurfaceAndContext(i32 client_width, i32 client_height)
 
     return {connection, offscreen_surface,client_width, client_height};
 }
-
- void renderTriangleTest()
-    {
-        RENDERER_LOG("Current Working Directory: %s", std::filesystem::current_path().c_str());
-
-
-        SurfaceState surface = createSurfaceAndContext(2000, 2000);
-
-        StackArena triangle_arena{1024 * 10};
-        auto vs = loadFile(triangle_arena, "src/shaders/triangleVS.glsl");
-        auto fs = loadFile(triangle_arena, "src/shaders/triangleFS.glsl");
-
-        auto vs_obj = compileShader(vs, GL_VERTEX_SHADER);
-        auto fs_obj = compileShader(fs, GL_FRAGMENT_SHADER);
-        RENDERER_ASSERT(vs_obj != -1 && fs_obj != -1, "Bad shader");
-
-        u32 shader_program;
-        shader_program = glCreateProgram();
-        glAttachShader(shader_program,static_cast<u32>(vs_obj));
-        glAttachShader(shader_program,static_cast<u32>(fs_obj));
-        glLinkProgram(shader_program);
-        i32 program_created;
-        glGetProgramiv(shader_program,GL_LINK_STATUS,&program_created);
-        RENDERER_ASSERT(program_created, "bad shader");
-
-        glClearColor(1.0,0.0,0.0,1.0);
-        glViewport(0, 0, 2000, 2000);
-
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        u32 dummy_vao;
-        glGenVertexArrays(1, &dummy_vao);
-        glBindVertexArray(dummy_vao);
-
-        glUseProgram(shader_program);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
-        std::vector<u8> colour_buffer(2000 * 2000 * 3);
-
-        glReadPixels(0,0,2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-        stbi_flip_vertically_on_write(true);
-        stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
-    }
-
 
 
 
@@ -205,89 +138,6 @@ struct GlRenderer
         RENDERER_LOG(titleBarString);
     }
 
-    void renderTriangle()
-    {
-        RENDERER_LOG("Current Working Directory: %s", std::filesystem::current_path().c_str());
-
-
-        // SurfaceState surface = createSurfaceAndContext(2000, 2000);
-
-        StackArena triangle_arena{1024 * 10};
-        auto vs = loadFile(triangle_arena, "src/shaders/triangleVS.glsl");
-        auto fs = loadFile(triangle_arena, "src/shaders/triangleFS.glsl");
-
-        auto vs_obj = compileShader(vs, GL_VERTEX_SHADER);
-        auto fs_obj = compileShader(fs, GL_FRAGMENT_SHADER);
-        RENDERER_ASSERT(vs_obj != -1 && fs_obj != -1, "Bad shader");
-
-        u32 shader_program;
-        shader_program = glCreateProgram();
-        glAttachShader(shader_program,static_cast<u32>(vs_obj));
-        glAttachShader(shader_program,static_cast<u32>(fs_obj));
-        glLinkProgram(shader_program);
-        i32 program_created;
-        glGetProgramiv(shader_program,GL_LINK_STATUS,&program_created);
-        RENDERER_ASSERT(program_created, "bad shader");
-
-        glClearColor(1.0,0.0,0.0,1.0);
-        glViewport(0, 0, 2000, 2000);
-
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        u32 dummy_vao;
-        glGenVertexArrays(1, &dummy_vao);
-        glBindVertexArray(dummy_vao);
-
-        glUseProgram(shader_program);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
-        std::vector<u8> colour_buffer(2000 * 2000 * 3);
-
-        glReadPixels(0,0,2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-        stbi_flip_vertically_on_write(true);
-        stbi_write_png("test.png",2000, 2000 ,3, colour_buffer.data(), 2000 * 3);
-    }
-
-    void hardcodedTest() {
-        renderer.particle_data.resize(1000);
-        srand(20);
-        for (auto& p : renderer.particle_data)
-            p = {glmath::Vec4{rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, 0.0},
-                glmath::Vec4{rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, rand() / (f32)RAND_MAX, 1.0}};
-        
-        glmath::Mat4x4 projection = glmath::perspectiveProjection(45.0 * glmath::PI / 180.0,
-            (f32)surface_state.client_width / surface_state.client_height, 0.1f, 1000.f);
-        glmath::Mat4x4 view = glmath::lookAt({0.0, 0.0, -2.0}, {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0});
-        
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glUseProgram(renderer.shader_program);
-        glUniformMatrix4fv(renderer.projection_uniform, 1, false, projection.data[0]);
-        glUniformMatrix4fv(renderer.view_uniform, 1, false, view.data[0]);
-        
-        renderer.light_pos[0] = glmath::Vec3(view * glmath::Vec4({3.0, 3.0, 3.0}, 1.0f));
-        glUniform3fv(renderer.point_light_uniform, MAX_POINT_LIGHTS, renderer.light_pos[0].data);
-        
-        glBindVertexArray(renderer.dummy_vao);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, renderer.dynamic_sso);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, renderer.dynamic_sso);
-        
-        glBufferData(GL_SHADER_STORAGE_BUFFER, renderer.particle_data.capacity() * sizeof(ParticleData), renderer.particle_data.data(), GL_DYNAMIC_DRAW);
-        
-
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-        glUniform1ui(renderer.render_mode_uniform, 1);
-        glDrawArrays(GL_TRIANGLES, 0, 6 * renderer.particle_data.size());
-        
-        glBindVertexArray(0);
-        
-        std::vector<u8> colour_buffer(2000 * 2000 * 3);
-        glReadPixels(0, 0, 2000, 2000, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-        stbi_flip_vertically_on_write(true);
-        stbi_write_png("test.png", 2000, 2000, 3, colour_buffer.data(), 2000 * 3);
-    }
-
-// #define PYTHON_BINDING 1
 #if PYTHON_BINDING
     void particles(nanobind::ndarray<f32, nanobind::shape<-1, 3>>& centres, nanobind::ndarray<f32, nanobind::shape<-1, 4>>& colours, f32 radius)
     {
@@ -351,10 +201,6 @@ struct GlRenderer
             i32 col = i % pitch;
             colour_buffer_flipped[i] = colour_buffer[(surface_state.client_height - 1 - row) * pitch + col];
         }
-
-
-
-
         return nanobind::cast(nanobind::ndarray<u8, nanobind::numpy>(colour_buffer_flipped.data(), {static_cast<u64>(surface_state.client_height), static_cast<u64>(surface_state.client_width), static_cast<u64>(n_channels)}));
     }
 
@@ -378,7 +224,7 @@ struct GlRenderer
         std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * n_channels);
 
         glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-        stbi_write_png("test.png",surface_state.client_width, surface_state.client_height ,3, colour_buffer.data(), surface_state.client_width * 3);
+        stbi_write_png(path.c_str(),surface_state.client_width, surface_state.client_height ,3, colour_buffer.data(), surface_state.client_width * 3);
     }
 
 #else
@@ -425,7 +271,7 @@ struct GlRenderer
         std::vector<u8> colour_buffer(surface_state.client_width * surface_state.client_height * 3);
 
         glReadPixels(0,0,surface_state.client_width, surface_state.client_height, GL_RGB, GL_UNSIGNED_BYTE, colour_buffer.data());
-        stbi_write_png("test.png",surface_state.client_width, surface_state.client_height,3,colour_buffer.data(), surface_state.client_width * 3);
+        stbi_write_png(path.c_str(), surface_state.client_width, surface_state.client_height,3,colour_buffer.data(), surface_state.client_width * 3);
     }
 #endif
 
@@ -435,33 +281,19 @@ struct GlRenderer
 
 #if PYTHON_BINDING
 NB_MODULE(glrendererEGL, m) {
-    m.def("renderTriangle", &renderTriangleTest);
     nanobind::class_<GlRenderer>(m, "GlRenderer")
         .def(nanobind::init<i32, i32>())
         .def("getImageRGB", &GlRenderer::getImageRGB)
         .def("particles", &GlRenderer::particles)
         .def("setCamera", &GlRenderer::setCamera)
         .def("setBackgroundColour", &GlRenderer::setBackgroundColour)
-        .def("renderTriangle", &GlRenderer::renderTriangle)
-        .def("hardcodedTest", &GlRenderer::hardcodedTest)
-
         .def("saveImageRGB", &GlRenderer::saveImageRGB);
 }
 
 #else
 
-
-
-
-
-
-
-
-
-
 int main()
 {
-
     srand(20);
     
     i32 dim = 3;
@@ -486,8 +318,6 @@ int main()
 
 
     auto renderer = GlRenderer(2000, 2000);
-
-    renderer.hardcodedTest();
     return 0;
 
     glmath::Vec3 pos = {0.5,0.5,-2.0};
@@ -496,6 +326,7 @@ int main()
     renderer.setCamera(pos, lookat);
 
     renderer.particles(points, colour, 0.01);
+    
     renderer.show("test.png");
 
 

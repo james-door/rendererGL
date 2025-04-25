@@ -9,7 +9,7 @@ else
     exit 1
 fi
 
-if [-z "$2"]; then
+if [ -z "$2" ]; then
     echo "Expected that path to the python executable to use for compiling."
     exit 1
 else

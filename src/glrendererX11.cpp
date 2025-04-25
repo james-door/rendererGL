@@ -11,6 +11,7 @@
 
 #include <string>
 #include <filesystem>
+#include <vector>
 
 #include <X11/Xlib.h>
 #include "external/glad/glad_glx.h"
@@ -53,8 +54,6 @@ SurfaceState createSurfaceAndContext()
     constexpr i32 border_width = 4;
     constexpr i32 fb_attributes[] = {GLX_RENDER_TYPE, GLX_RGBA_BIT, GLX_RED_SIZE, 8,GLX_GREEN_SIZE, 8,GLX_BLUE_SIZE, 8,GLX_ALPHA_SIZE, 8,GLX_DEPTH_SIZE, 24,GLX_DOUBLEBUFFER, True, None};
     constexpr int context_attribs[] = {GLX_CONTEXT_MAJOR_VERSION_ARB, 4,GLX_CONTEXT_MINOR_VERSION_ARB, 3, GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB, None};
-    
-
 
     XSetErrorHandler(d11_error_handler);
     Display* connection = XOpenDisplay(nullptr); //X11 allocates
@@ -311,7 +310,7 @@ struct GlRenderer
     void particles(const std::vector<glmath::Vec3> &centres, const std::vector<glmath::Vec4> &colours, f32 radius)
     {
         // set the radius for all particles in the frame, should really just be for this call
-        setRadius(renderer,radius);
+        setRadius(renderer, radius);
 
 
         i64 points_to_allocate = centres.size();
@@ -428,139 +427,3 @@ int main()
     RENDERER_LOG("Exiting...");
 }
 #endif
-
-
-void GlRenderer::logDiagnostics() {
-    // Log X11 display information
-    RENDERER_LOG("X11 Display Information:");
-    RENDERER_LOG("  Display: %s", XDisplayName(nullptr));
-    RENDERER_LOG("  Screen: %d (Default Screen: %d)", 
-                 DefaultScreen(surface_state.connection), 
-                 ScreenCount(surface_state.connection));
-    RENDERER_LOG("  Root Window ID: %lu", RootWindow(surface_state.connection, DefaultScreen(surface_state.connection)));
-    RENDERER_LOG("  Window ID: %lu", surface_state.window);
-    RENDERER_LOG("  Client Width: %d", surface_state.client_width);
-    RENDERER_LOG("  Client Height: %d", surface_state.client_height);
-
-    // Log screen-specific information
-    Screen* screen = ScreenOfDisplay(surface_state.connection, DefaultScreen(surface_state.connection));
-    RENDERER_LOG("Screen Information:");
-    RENDERER_LOG("  Width: %d", screen->width);
-    RENDERER_LOG("  Height: %d", screen->height);
-    RENDERER_LOG("  Depth: %d", screen->root_depth);
-
-
-    // Log GLX information
-    RENDERER_LOG("GLX Information:");
-    int glxMajor, glxMinor;
-    glXQueryVersion(surface_state.connection, &glxMajor, &glxMinor);
-    RENDERER_LOG("  GLX Version: %d.%d", glxMajor, glxMinor);
-
-    const char* glxExtensions = glXQueryExtensionsString(surface_state.connection, DefaultScreen(surface_state.connection));
-    RENDERER_LOG("  GLX Extensions: %s", glxExtensions);
-
-    // Log framebuffer configuration
-    RENDERER_LOG("Framebuffer Configuration:");
-    GLXFBConfig fbConfig = surface_state.fb_config;
-    if (fbConfig) {
-        int redBits, greenBits, blueBits, alphaBits, depthBits, stencilBits;
-        glXGetFBConfigAttrib(surface_state.connection, fbConfig, GLX_RED_SIZE, &redBits);
-        glXGetFBConfigAttrib(surface_state.connection, fbConfig, GLX_GREEN_SIZE, &greenBits);
-        glXGetFBConfigAttrib(surface_state.connection, fbConfig, GLX_BLUE_SIZE, &blueBits);
-        glXGetFBConfigAttrib(surface_state.connection, fbConfig, GLX_ALPHA_SIZE, &alphaBits);
-        glXGetFBConfigAttrib(surface_state.connection, fbConfig, GLX_DEPTH_SIZE, &depthBits);
-        glXGetFBConfigAttrib(surface_state.connection, fbConfig, GLX_STENCIL_SIZE, &stencilBits);
-        RENDERER_LOG("  Red Bits: %d", redBits);
-        RENDERER_LOG("  Green Bits: %d", greenBits);
-        RENDERER_LOG("  Blue Bits: %d", blueBits);
-        RENDERER_LOG("  Alpha Bits: %d", alphaBits);
-        RENDERER_LOG("  Depth Bits: %d", depthBits);
-        RENDERER_LOG("  Stencil Bits: %d", stencilBits);
-    } else {
-        RENDERER_LOG("  No framebuffer configuration available.");
-    }
-
-    // Log OpenGL context information
-    RENDERER_LOG("OpenGL Context Information:");
-    const u8* glVersion = glGetString(GL_VERSION);
-    RENDERER_LOG("  OpenGL Version: %s", glVersion);
-    const u8* glVendor = glGetString(GL_VENDOR);
-    RENDERER_LOG("  Vendor: %s", glVendor);
-    const u8* glRendererStr = glGetString(GL_RENDERER);
-    RENDERER_LOG("  Renderer: %s", glRendererStr);
-    const u8* glShadingLanguageVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
-    RENDERER_LOG("  GLSL Version: %s", glShadingLanguageVersion);
-
-    // Log OpenGL extensions
-    RENDERER_LOG("OpenGL Extensions:");
-    const u8* glExtensions = glGetString(GL_EXTENSIONS);
-    RENDERER_LOG("  Extensions: %s", glExtensions);
-
-    // Log GLX context attributes
-    RENDERER_LOG("GLX Context Attributes:");
-    GLXContext context = glXGetCurrentContext();
-    if (context) {
-        int contextAttribs[] = {
-            GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
-            GLX_CONTEXT_MINOR_VERSION_ARB, 3,
-            GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
-            None
-        };
-        RENDERER_LOG("  Context Major Version: %d", contextAttribs[1]);
-        RENDERER_LOG("  Context Minor Version: %d", contextAttribs[3]);
-        RENDERER_LOG("  Context Profile: %s", 
-                     (contextAttribs[5] == GLX_CONTEXT_CORE_PROFILE_BIT_ARB) ? "Core" : "Compatibility");
-    } else {
-        RENDERER_LOG("  No current GLX context.");
-    }
-
-    // Log visual info
-    XVisualInfo* visualInfo = glXGetVisualFromFBConfig(surface_state.connection, fbConfig);
-    if (visualInfo) {
-        RENDERER_LOG("Visual Information:");
-        RENDERER_LOG("  Visual ID: %lu", visualInfo->visualid);
-        RENDERER_LOG("  Depth: %d", visualInfo->depth);
-        RENDERER_LOG("  Class: %s", 
-                      (visualInfo->c_class == StaticGray) ? "StaticGray" :
-                      (visualInfo->c_class == GrayScale) ? "GrayScale" :
-                      (visualInfo->c_class == StaticColor) ? "StaticColor" :
-                      (visualInfo->c_class == PseudoColor) ? "PseudoColor" :
-                      (visualInfo->c_class == TrueColor) ? "TrueColor" :
-                      (visualInfo->c_class == DirectColor) ? "DirectColor" : "Unknown");
-        XFree(visualInfo);
-    } else {
-        RENDERER_LOG("  No visual information available.");
-    }
-
-    // Log current OpenGL state
-    RENDERER_LOG("OpenGL State:");
-    i32 maxTextureSize;
-    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
-    RENDERER_LOG("  Max Texture Size: %d", maxTextureSize);
-
-    i32 maxViewportDims[2];
-    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, maxViewportDims);
-    RENDERER_LOG("  Max Viewport Dimensions: %d x %d", maxViewportDims[0], maxViewportDims[1]);
-
-    i32 viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    RENDERER_LOG("  Current Viewport: %d, %d, %d, %d", viewport[0], viewport[1], viewport[2], viewport[3]);
-
-    i32 scissorBox[4];
-    glGetIntegerv(GL_SCISSOR_BOX, scissorBox);
-    RENDERER_LOG("  Scissor Box: %d, %d, %d, %d", scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3]);
-
-    bool depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
-    RENDERER_LOG("  Depth Test Enabled: %s", depthTestEnabled ? "Yes" : "No");
-    i32 depthFunc;
-    glGetIntegerv(GL_DEPTH_FUNC, &depthFunc);
-    RENDERER_LOG("  Depth Test Function: %d", depthFunc); 
-
-
-    bool cullFaceEnabled = glIsEnabled(GL_CULL_FACE);
-    RENDERER_LOG("  Cull Face Enabled: %s", cullFaceEnabled ? "Yes" : "No");
-
-    i32 frontFace;
-    glGetIntegerv(GL_FRONT_FACE, &frontFace);
-    RENDERER_LOG("  Front Face: %s", frontFace == GL_CW ? "CW" : "CCW");
-}

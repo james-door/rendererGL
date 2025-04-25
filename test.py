@@ -1,39 +1,13 @@
 import numpy as np
-from skimage.io import imsave
 import taichi as ti
 import time
+from ..build.EGL.glrendererEGL import GlRenderer
 
-
-ti.init(arch=ti.cuda)
-
-# import debugpy
-
-# debugpy.listen(("0.0.0.0", 5678))
-# print("Waiting for debugger to attach...")
-# debugpy.wait_for_client()  # Script pauses here until a debugger attaches
-
-
-from build.EGL.glrendererEGL import GlRenderer
-
-import sys
-
-
-print(sys.version)
-
-print()
-print()
-
-# dim, n_grid, steps, dt = 2, 128, 20, 2e-4
-# dim, n_grid, steps, dt = 2, 256, 32, 1e-4
-# dim, n_grid, steps, dt = 3, 32, 25, 4e-4
-# dim, n_grid, steps, dt = 3, 128, 5, 1e-4
+ti.init(arch=ti.cpu)
 
 dim, n_grid, steps, dt = 3, 64, 25, 2e-4
-
 n_particles = n_grid**dim // 2 ** (dim - 1)
-
-
-dx = 1 / n_grid
+dx = 1 / n_grid 
 
 p_rho = 1
 p_vol = (dx * 0.5) ** 2
@@ -43,7 +17,6 @@ bound = 3
 E = 1000  # Young's modulus
 nu = 0.2  #  Poisson's ratio
 mu_0, lambda_0 = E / (2 * (1 + nu)), E * nu / ((1 + nu) * (1 - 2 * nu))  # Lame parameters
-
 F_x = ti.Vector.field(dim, float, n_particles)
 F_v = ti.Vector.field(dim, float, n_particles)
 F_C = ti.Matrix.field(dim, dim, float, n_particles)
@@ -56,9 +29,7 @@ F_materials = ti.field(int, n_particles)
 F_grid_v = ti.Vector.field(dim, float, (n_grid,) * dim)
 F_grid_m = ti.field(float, (n_grid,) * dim)
 F_used = ti.field(int, n_particles)
-
 neighbour = (3,) * dim
-
 WATER = 0
 JELLY = 1
 SNOW = 2
@@ -271,15 +242,9 @@ def render(window, camera, scene, canvas):
 
 
 def main():
-
-    
-
     renderer = GlRenderer(2000, 2000)
     background_colour = np.array([0.0, 0.0, 0.0])
     renderer.setBackgroundColour(background_colour)
-
-
-
     pos = np.array([0.5, 0.5, -3.0])
     lookat = np.array([0.5, 0.5, 1.0])
     renderer.setCamera(pos, lookat)
@@ -291,8 +256,7 @@ def main():
     material_colors[SNOW] =  material_colors[SNOW]
     material_colors[JELLY] = material_colors[JELLY]
     set_color_by_material(np.array(material_colors, dtype=np.float32))
-
-    max_frames = 1000
+    max_frames = 250
     while frame_id < max_frames:
 
         if not paused:
@@ -305,44 +269,13 @@ def main():
         frame_start = time.time()
         colors_used_np = colors_used.to_numpy()
         renderer.particles(F_x_np, colors_used_np, 0.01)
-        
-        # test = renderer.getImageRGB()
-        # imsave("test.png",test)
-        renderer.saveImageRGB("test.png")
+        renderer.saveImageRGB(f"{frame_id}.png")
         
         frame_end = time.time()
         print(f"Frame time: {frame_end - frame_start}s")
 
 
         frame_id +=1
-        
-        
-
-
-
-
-
-    # res = (1080, 720)
-    # window = ti.ui.Window("Real MPM 3D", res, vsync=True)
-    # canvas = window.get_canvas()
-    # gui = window.get_gui()
-    # scene = window.get_scene()
-    # camera = ti.ui.Camera()
-    # camera.position(0.5, 1.0, 1.95)
-    # camera.lookat(0.5, 0.3, 0.5)
-    # camera.fov(55)
-
-    # while window.running:
-    #     frame_id += 1
-    #     frame_id = frame_id % 256
-
-    #     if not paused:
-    #         for _ in range(steps):
-    #             substep(*GRAVITY)
-
-    #     render(window,camera,scene,canvas)
-    #     window.show()
-
 
 if __name__ == "__main__":
     main()
